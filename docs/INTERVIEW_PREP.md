@@ -4,6 +4,34 @@ This document exists so you can answer *any* question about this project, from "
 
 ---
 
+## Part 0 — How These Interviews Actually Work (Read This First)
+
+Before the facts, understand the *shape* of what's coming — this changes how you prepare, not just what you memorize. This section is based on how technical "project deep dive" interviews are actually run and evaluated, not guesswork.
+
+### The format: you drive, they probe
+A project deep-dive round is rarely a straight Q&A quiz. The typical shape: the interviewer sets context for a minute or two, then hands you the floor for 20–40 minutes to walk through a project of your choosing, interrupting with follow-ups whenever something catches their interest. **For Indian off-campus/fresher interviews specifically, the project walkthrough is frequently the single most decisive part of the entire interview** — more prep time spent defending your project's actual decisions beats more time spent memorizing extra algorithm trivia you won't be asked about.
+
+### The real pattern: progressive "why"
+Nearly every interviewer follows the same escalation, regardless of company: you describe what you built → they ask *why* you built it that way → you answer → they ask what you'd do *if [some constraint] changed* → and so on, several layers deep, on whichever single decision happens to catch their interest. They are not testing whether you memorized a fact — they're testing whether your understanding has real depth or is one layer thick. This is exactly why Part 9's stories aren't just facts — each is Situation → Action → Result → Why it's a good answer, so you can go 3–4 "whys" deep on any of them without running out of real content. Practice this: after reading a Part 9 story, ask yourself "if they pushed back on this decision, what would I say?" and make sure you have an answer.
+
+### What's actually being evaluated (not just what's asked)
+Underneath the specific questions, interviewers are really checking:
+- **Do you understand your own reasoning, or did you follow a tutorial?** Can you justify a decision, not just describe it?
+- **Do you proactively surface tradeoffs, or only admit them when pushed?** Say "RF's recall dropped after tuning, and here's why that's an acceptable tradeoff" *before* they ask — strong candidates volunteer the tradeoff, weak ones wait to be caught.
+- **Can you explain a technical concept to someone without losing them?** Practice the "explain it to a beginner" version of every Part 9 story, not just the jargon-heavy version.
+- **Do you know what's *not* done, and why?** Part 8/12's honesty about production gaps reads as maturity, not weakness. Claiming something is "fully production ready" when it obviously isn't is a bigger red flag than admitting the gap.
+- **Is your project's scope believable for your experience level?** A solo tier-3-college portfolio project with real commits, tests, CI, and documented debugging stories is *more* credible than a vague "I built a full enterprise platform" claim — specificity, not size, is what makes a project believable. Interviewers are trained to probe exactly this with questions like "what result did you expect vs. what did you actually get" and "what would you have done differently" — Part 9 is built around exactly this expected-vs-actual structure, and Part 12 is your rehearsed answer to the second question.
+
+### The one habit that matters most
+Vague, generic answers ("it went well," "I improved performance," "it works well now") are the single biggest tell that a candidate didn't really engage with their own project. Always answer with the specific number and the specific mechanism — this document gives you both for every major decision in this project, so there's never a reason to be vague.
+
+### How to actually use this document
+1. Read Parts 1–9 once, fully, so you *understand* the reasoning — don't just skim for facts to recite.
+2. Practice saying each Part 9 story out loud twice: once as a 60–90 second version (Situation/Action/Result only), once as a longer version where you also answer 2–3 obvious follow-up "why"s unprompted.
+3. Use Part 10 as a self-test *after* that, not as your first read.
+
+---
+
 ## Part 1 — Why This Project & What It Is
 
 ### Why I chose this project (your narrative)
@@ -38,7 +66,7 @@ It is a full web app: you log in, fill a form, get a decision report with charts
 4. **The explainability**: SHAP values show which of the 20 input features pushed the decision toward approval or rejection — not just "the model said no," but "the model said no *because of X*."
 5. **The debugging story**: found and fixed an encoding bug that was making explanations misleading (see Part 9 — this is your best individual talking point).
 6. **The business layer**: false negatives (missed defaulters) and false positives (rejected good customers) don't cost a bank the same amount — I built a threshold-tuning view that shows the cost curve and recommends a policy.
-7. **What's next**: deploy the backend fully, add pagination, consolidate two overlapping DB tables (see Part 12).
+7. **What's next**: deploy the backend fully (Part 12's top remaining item), add pagination, calibrate the business-impact cost assumptions against real data.
 
 ---
 
@@ -111,6 +139,7 @@ flowchart TB
 | **SHAP** | Explains individual predictions — which features pushed the score which way | `LinearExplainer` vs `TreeExplainer`, what a Shapley value is conceptually |
 | **marshmallow** | Validates every incoming credit-application payload (`/predict`, `/simulate`, `/batch`, `/loans`) before it touches the model | `Schema.from_dict()`, `fields.Integer/Float/Str`, `validate.Range`/`validate.OneOf`, catching `ValidationError` |
 | **XGBoost** | Trained as a third, benchmark-only model to compare against LR/RF | Gradient boosting basics, why it typically needs tuning to beat a bagged ensemble on small data |
+| **openai (Python SDK)** | Powers the AI Advisor chat feature — calls an OpenAI-compatible chat completions API | System prompts, `temperature`, conversation history/roles, why this is context injection and not RAG (see Part 5's assistant.py section) |
 | **gunicorn** | Production WSGI server (Flask's built-in server isn't for production) | Why dev servers aren't production-safe |
 | **pytest / pytest-flask** | Automated tests (regression thresholds + explainability sanity checks) | Fixtures, `assert`, test client pattern |
 
@@ -292,11 +321,19 @@ Notice `/predict`, `/metrics`, `/business-impact`, `/simulate`, `/batch` have **
 ### `backend/app/routes/loans.py`
 Now a thin, backward-compatible view over `ml.py`'s `CreditApplication` table (previously a legacy parallel path over `Loan`+`LoanDecision` — see the consolidation story in Part 9). `_loan_payload()` adds EMI/amortization display fields via `finance.py` helpers, falling back to `credit_amount` when `loan_amount` wasn't explicitly set. `GET /loans` and `GET /loans/<id>/decision` exist so the frontend's `/loans/*` URL aliases keep working with zero frontend changes; there's no more `POST /loans` — `/ml/predict` persists everything in one write now.
 
-### `backend/app/routes/assistant.py`
+### `backend/app/routes/assistant.py` — the LLM / GenAI layer
 - If `OPENAI_API_KEY` isn't set, immediately returns a friendly message telling the user to configure it — never crashes.
 - If an `application_id` is passed, loads that `CreditApplication`'s top-3 RF SHAP reasons and final decision, and injects them into the system prompt as `LOADED APPLICATION #...` context, so the AI can answer "why was I rejected" with the actual factors instead of generic advice.
 - Calls OpenAI's chat completion API (`gpt-4o-mini` by default, configurable) with the last 10 turns of conversation history plus the new message.
 - **If the OpenAI call throws for any reason** (bad key, network, rate limit, quota) — falls back to `_fallback_reply`, a simple keyword-matching rule engine (checks for "shap", "emi"/"loan"/"approval", "roc"/"auc"/"confusion") that gives a canned but genuinely useful explanation, so the Assistant page never breaks even with zero API budget. This dual-path design (best-effort live LLM + guaranteed local fallback) is a good "resilience/graceful degradation" talking point.
+
+**GenAI/LLM concepts to know cold** — as of 2026, "have you worked with LLMs" is a standard question even at fresher level, and this feature is your real, honest answer to it:
+- **System prompt**: `SYSTEM_PROMPT` is a fixed instruction block sent as the first message of every conversation — it defines the assistant's persona and rules ("be actionable," "never invent application facts not in the loaded context") and has a `{loan_context}` placeholder where the per-request application data gets interpolated in. This is *prompt engineering* — shaping the input text — not model training; no weights are touched.
+- **This is context injection, not RAG** — an important, honest distinction to volunteer if asked "did you use RAG?": Retrieval-Augmented Generation would embed a knowledge base and vector-search it per query at run time. This app does something much simpler and fully deterministic: it fetches one specific `CreditApplication` row by ID with a normal SQL query and formats known fields directly into the prompt text. No embeddings, no vector store, no retrieval step. Correctly naming what you *didn't* build is more credible than implying RAG when the mechanism is actually a plain DB lookup.
+- **Temperature (`0.45`)**: controls randomness in the model's next-token sampling — near `0` is close to deterministic/repetitive, `1`+ is more "creative" and less consistent. `0.45` is a moderate middle ground appropriate for financial-advice-adjacent responses: some natural variation, but not wildly inconsistent answers to the same question.
+- **Why `gpt-4o-mini`, not a larger model**: a deliberate cost/speed/quality tradeoff — a chat-assistant feature explaining already-computed SHAP factors doesn't need frontier-level reasoning, so the cheaper/faster model is the right default (configurable via `OPENAI_MODEL` if ever needed).
+- **Conversation history**: the last 10 turns from `conversation_history` are replayed as prior `user`/`assistant` role messages so the model has multi-turn context. It's a fixed-size sliding window, not a summarization strategy — a real product would eventually need one as conversations grow past what fits in context.
+- **Hallucination guardrail, honestly framed**: the system prompt explicitly instructs "never invent application facts that are not in the loaded context," and separately tells the model to suggest a qualified professional rather than give definitive legal/tax/investment advice. This is a *prompt-level mitigation*, not a hard technical guarantee — an LLM can still ignore instructions. The honest caveat if pushed: this reduces hallucination risk, it doesn't eliminate it; a stricter production system would add output validation or constrain the model to only reference values it was explicitly given.
 
 ### `backend/app/routes/dashboard.py`
 Aggregates counts (approved/rejected/pending/consensus rate) directly from `CreditApplication` — no more dual-source fallback logic now that `Loan`/`LoanDecision` are gone. Also reads `model_metrics.pkl` directly to surface RF's training accuracy as a headline dashboard number.
@@ -345,7 +382,7 @@ One shared `axios` instance with `baseURL` from `VITE_API_BASE_URL` (falls back 
 The single source of truth shared by every page: human-readable `FEATURE_LABELS`, the code→label `VALUE_LABELS` maps (so the UI never shows raw `"A11"` to a user, always "Below 0 DM"), `DEFAULT_LOAN_INPUT` (used to pre-fill forms and simulations), and small formatters (`money`, `percent`, `displayValue`). Centralizing this avoids every page re-implementing the same lookup tables.
 
 ### `frontend/src/pages/LoanForm.jsx`
-A 4-step wizard (Personal → Financial → Loan → Review) using local component state (`useState`) for the form object and current step index. `fieldControl()` renders either a `<select>` (for categorical fields, pulling options from `creditFeatures.optionSets`) or a range `<input type="range">` slider (for numeric fields, with hand-tuned min/max/step per field). On submit: calls `/ml/predict`, then `/loans` to persist it, caches the decision in `localStorage` (as a fallback if the detail-fetch route fails later), then navigates to the decision report.
+A 4-step wizard (Personal → Financial → Loan → Review) using local component state (`useState`) for the form object and current step index. `fieldControl()` renders either a `<select>` (for categorical fields, pulling options from `creditFeatures.optionSets`) or a range `<input type="range">` slider (for numeric fields, with hand-tuned min/max/step per field). On submit: calls `/ml/predict` **once** (this used to be two calls — see Part 9's schema-consolidation story for why it isn't anymore), caches the decision in `localStorage` (as a fallback if the detail-fetch route fails later), then navigates straight to `/applications/:id` using the `application_id` the same predict response already returned.
 
 ### `frontend/src/pages/LoanDecision.jsx`
 Handles **two different data shapes** depending on how you arrived here:
@@ -401,6 +438,7 @@ Since FN costs ~5.6× more than FP per case in this model, the "optimal" policy 
 - Batch endpoint hard-caps at 100 rows (basic DoS/resource-exhaustion guard).
 - Real Alembic migrations (Flask-Migrate) manage schema changes, applied automatically via `flask db upgrade` in both `Dockerfile` and `docker-compose.yml` before the app starts, with a CI step that verifies migrations apply cleanly to a fresh database on every push (see Part 5's migration story).
 - Structured request logging (method/path/status/duration on every request) plus a global safety-net error handler that logs full tracebacks server-side while returning a clean, non-leaking JSON error to the client — see `logging_config.py` in Part 5.
+- All three deployment paths (Docker/nginx, Render, Vercel) correctly rewrite unmatched paths to `index.html` so client-side routes don't 404 on direct navigation — see Part 9's SPA-rewrite bug story for how the Vercel gap was actually found and fixed.
 
 **What you should proactively say is NOT production-ready** (interviewers respect this more than pretending everything is perfect):
 - `SECRET_KEY`/`JWT_SECRET_KEY` default to hardcoded dev values in `config.py` if the `.env` var is missing — fine locally, would be a real vulnerability if deployed with defaults.
@@ -484,7 +522,7 @@ This one has two acts, and telling both is what makes it strong.
 ### Warm-up / HR-round level
 1. **What is CreditIQ?** → Use the 30-second pitch (Part 1).
 2. **Why did you build this?** → Use the "why" narrative (Part 1).
-3. **What was the hardest part?** → The encoding bug (Part 9), or reconciling two overlapping DB schemas as the design evolved (Part 12).
+3. **What was the hardest part?** → The encoding bug (Part 9), or the schema-consolidation refactor that merged two overlapping DB tables the design had accumulated (Part 5/9).
 4. **What would you do differently?** → Part 12, verbatim.
 
 ### ML fundamentals
@@ -512,6 +550,14 @@ This one has two acts, and telling both is what makes it strong.
 18. **What did you do when SHAP explanations contradicted domain intuition?** → Part 4's domain-sanity calibration + Part 9's debugging story.
 19. **Is SHAP the same as feature importance?** → No — `feature_importances_` (RF) is a *global*, training-time measure of a feature's average usefulness across the whole model; SHAP gives a *per-prediction, per-feature* explanation for one specific applicant.
 20. **What's the fallback if SHAP fails at runtime?** → Part 4/Part 5 — coefficient×value (LR) or global feature importances (RF), so the API never 500s.
+
+### GenAI / LLM (standard even at fresher level in 2026 — don't skip this cluster)
+20b. **Have you worked with LLMs / GenAI?** → Yes — the AI Advisor (`assistant.py`, Part 5). Lead with what it actually does: a system prompt defining persona/rules, per-request context injection from the loaded application's SHAP factors, conversation history, and a guaranteed local fallback if the API is unavailable.
+20c. **Did you use RAG?** → No, and say so precisely — this is context injection (a plain SQL lookup by ID, formatted into the prompt), not Retrieval-Augmented Generation (which would embed and vector-search a knowledge base). Naming the actual mechanism instead of the more impressive-sounding buzzword is the stronger answer.
+20d. **What does `temperature` control in an LLM API call?** → Randomness in next-token sampling — lower is more deterministic/repetitive, higher is more varied/less consistent. This app uses `0.45`, a moderate middle ground for financial-advice-adjacent responses.
+20e. **How do you handle hallucination, or would you trust this for real financial advice?** → The system prompt explicitly instructs the model never to invent facts outside the loaded context and to defer legal/tax/investment questions to a qualified professional — but be honest that this is a prompt-level mitigation, not a hard guarantee; a production system would need output validation on top of it.
+20f. **What's a system prompt vs a user prompt?** → System prompt = fixed instructions/persona sent once per conversation, set by the developer (`SYSTEM_PROMPT` here); user prompt = the actual question, changes every turn. Conversation history in this app replays prior turns as alternating `user`/`assistant` role messages so the model has multi-turn memory.
+20g. **Why `gpt-4o-mini` instead of a bigger model?** → Cost/speed/quality tradeoff — explaining already-computed SHAP factors doesn't need frontier-level reasoning, so the cheaper, faster model is the right default; configurable via `OPENAI_MODEL` if a harder task ever needed more.
 
 ### System design / architecture
 21. **Why Flask over Django/FastAPI?** → Lightweight, minimal boilerplate for a focused REST API; Django's full ORM/admin/templating wasn't needed; FastAPI would also have been reasonable (async, built-in validation) — honest answer: Flask was the familiar/pragmatic choice for this scope.
@@ -568,6 +614,7 @@ This one has two acts, and telling both is what makes it strong.
 - Class-imbalance fix impact: LR recall on bad-credit applicants 53.3% → 73.3% after `class_weight="balanced"`, while ROC-AUC stayed ~flat (0.7905 → 0.7908) — proof the boundary shifted, not the model's underlying discriminative power. RF's recall got *worse* under the same weighting, so RF was kept unweighted and its tradeoff is controlled via threshold tuning instead (Part 7).
 - Business assumptions: ₹35,000 avg loan, ₹14,000/missed-default, ₹2,500/wrongly-rejected-customer.
 - Batch limit: 100 rows. Rate limit: 5 auth attempts/min, 200/day + 50/hour general.
+- AI Advisor: `gpt-4o-mini`, `temperature=0.45`, last 10 conversation turns replayed, context injection (not RAG) from one `CreditApplication` row per request.
 
 **Acronym one-liners:**
 - **SHAP** = SHapley Additive exPlanations — game-theory-based per-prediction feature attribution.
@@ -595,4 +642,4 @@ This one has two acts, and telling both is what makes it strong.
 
 ---
 
-*Read this once fully, then skim Part 10 (the question bank) again right before any interview. If you can answer the "why" behind every row in Part 3's tech-stack table and retell Part 9's debugging story fluently, you are in the top tier of tier-3-college candidates for this kind of role — the college name stops being the thing that gets discussed.*
+*Read Part 0 first — it changes how you should read everything after it. Then read this once fully, and skim Part 10 (the question bank) again right before any interview. If you can answer the "why" behind every row in Part 3's tech-stack table and retell Part 9's debugging stories fluently — unprompted, with the follow-up "why"s already anticipated — you are in the top tier of tier-3-college candidates for this kind of role. The college name stops being the thing that gets discussed.*
