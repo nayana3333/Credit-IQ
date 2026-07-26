@@ -213,6 +213,9 @@ Reads `.env` (via `python-dotenv`), sets `SECRET_KEY`, `JWT_SECRET_KEY`, JWT exp
 ### `backend/app/extensions.py`
 Creates **singleton instances** of `db` (SQLAlchemy), `jwt` (JWTManager), `migrate` (Flask-Migrate/Alembic), and `limiter` (Flask-Limiter, in-memory storage, default 200/day + 50/hour per IP) *before* the app exists, so they can be imported anywhere without circular imports, then wired to the actual app inside `create_app()` via `.init_app(app)`. This is the standard Flask "application factory" pattern.
 
+### `backend/app/logging_config.py`
+`configure_logging(app)` sets up three things: (1) a structured stdout log formatter (timestamp, level, logger name, message) — deliberately stdout, not a file, since Render/Docker already capture container stdout into their own log viewer and a file inside the container would just vanish on every restart; (2) a `before_request`/`after_request` pair that logs every request as `METHOD /path -> status (Xms)`; (3) a global `@app.errorhandler(Exception)` safety net that logs the full traceback server-side and returns a generic `{"error": "..."}` JSON 500 to the client — **but only for genuinely unexpected exceptions**. It explicitly checks `isinstance(exc, HTTPException)` first and lets Flask handle those normally, otherwise registering a catch-all for `Exception` would also swallow ordinary 404s/405s and turn them into misleading 500s. Verified with 2 tests: one that registers a throwaway route raising `RuntimeError` and confirms a clean JSON 500 (with `PROPAGATE_EXCEPTIONS=False` to mimic production, since Flask's `TESTING`/debug modes normally propagate exceptions straight to pytest instead of through the error handler), and one confirming a real 404 still returns 404, not 500.
+
 ### `backend/app/__init__.py` — `create_app()`
 1. Builds the Flask app, loads config, applies CORS.
 2. Initializes db/jwt/limiter/migrate.
@@ -395,6 +398,7 @@ Since FN costs ~5.6× more than FP per case in this model, the "optimal" policy 
 - CORS explicitly enabled rather than left to fail silently in dev.
 - Batch endpoint hard-caps at 100 rows (basic DoS/resource-exhaustion guard).
 - Real Alembic migrations (Flask-Migrate) manage schema changes, applied automatically via `flask db upgrade` in both `Dockerfile` and `docker-compose.yml` before the app starts, with a CI step that verifies migrations apply cleanly to a fresh database on every push (see Part 5's migration story).
+- Structured request logging (method/path/status/duration on every request) plus a global safety-net error handler that logs full tracebacks server-side while returning a clean, non-leaking JSON error to the client — see `logging_config.py` in Part 5.
 
 **What you should proactively say is NOT production-ready** (interviewers respect this more than pretending everything is perfect):
 - `SECRET_KEY`/`JWT_SECRET_KEY` default to hardcoded dev values in `config.py` if the `.env` var is missing — fine locally, would be a real vulnerability if deployed with defaults.
@@ -502,6 +506,7 @@ This one has two acts, and telling both is what makes it strong.
 36. **How are passwords stored?** → Hashed (PBKDF2 via werkzeug), never plaintext, never returned in any API response.
 37. **How do you prevent brute-force login attempts?** → Flask-Limiter, 5 attempts/minute per IP on register and login.
 38. **Why write a custom AST evaluator instead of using `eval()`?** → `eval()` on user input is a code-injection vector (arbitrary Python execution); the AST walker only permits numeric literals and `+ - * / **`, rejecting anything else by construction.
+38b. **How would you know if something broke in production?** → `logging_config.py` (Part 5) logs every request's method/path/status/duration to stdout (which Render/Docker capture automatically), and a global error handler logs full tracebacks for any unexpected exception while still returning a clean, non-leaking JSON error to the client. It's careful not to swallow ordinary 404s into misleading 500s — it explicitly checks `isinstance(exc, HTTPException)` first. Next step beyond this would be shipping those logs somewhere queryable (Sentry, or a hosted log aggregator) instead of just stdout.
 
 ### Self-awareness / "what would you improve" (see Part 12 for the full list)
 39. **What's the biggest design flaw you'd fix first?** → This one's already fixed — see the schema-consolidation story (Part 5/9): `Loan`/`LoanDecision` were merged into `CreditApplication`, verified with new tests and a live end-to-end browser check. If asked what's next after that: the business-impact rupee figures are still illustrative, not calibrated (item below).

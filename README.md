@@ -148,7 +148,7 @@ approximation is a small non-monotonic artifact.
 ## Tech Stack
 
 - Frontend: React, Vite, Tailwind CSS, Recharts, Lucide icons.
-- Backend: Flask, SQLAlchemy, Flask-JWT-Extended.
+- Backend: Flask, SQLAlchemy, Flask-JWT-Extended. Structured request logging and a global error handler (`backend/app/logging_config.py`) log every request and any unexpected exception without leaking stack traces to the client.
 - Database: SQLite for local development. PostgreSQL can be used through `DATABASE_URL`. Schema is managed with Flask-Migrate/Alembic (`backend/migrations/`) rather than ad hoc `ALTER TABLE` patching.
 - ML/Scoring: scikit-learn Logistic Regression, Random Forest, model metrics, and explainability factors.
 - AI: OpenAI-compatible assistant route with context-aware fallback.

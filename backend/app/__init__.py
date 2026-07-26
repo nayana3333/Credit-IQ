@@ -5,6 +5,7 @@ from flask_cors import CORS
 
 from .config import Config
 from .extensions import db, jwt, limiter, migrate
+from .logging_config import configure_logging
 from .routes.assistant import assistant_bp
 from .routes.auth import auth_bp
 from .routes.dashboard import dashboard_bp
@@ -20,6 +21,7 @@ def create_app(test_config=None):
     if test_config:
         app.config.update(test_config)
 
+    configure_logging(app)
     CORS(app)
     db.init_app(app)
     jwt.init_app(app)
