@@ -211,6 +211,14 @@ sometimes needs a manual nudge for renames or data backfills. Both
 `Dockerfile` and `docker-compose.yml` run `flask db upgrade` before starting
 the app, so deployments apply pending migrations automatically.
 
+**Schema consolidation**: an earlier version of this app had a `Loan`+
+`LoanDecision` table pair alongside `CreditApplication`, both storing
+essentially the same credit-decision data - every loan submission wrote to
+both. These have been merged into `CreditApplication` (which gained
+`loan_amount`/`emi`/`interest_rate` columns to cover what `Loan` used to
+own); `/api/v1/loans` remains as a read-only, backward-compatible view over
+the same table rather than a separate one.
+
 ## Demo And Deployment
 
 Local demo steps are documented in [docs/DEMO_GUIDE.md](docs/DEMO_GUIDE.md).

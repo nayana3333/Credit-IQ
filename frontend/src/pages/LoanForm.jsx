@@ -27,18 +27,10 @@ export default function LoanForm() {
     const token = localStorage.getItem("token");
     if (token) setAuthToken(token);
     try {
-      const prediction = await api.post("/ml/predict", form);
-      const saved = await api.post("/loans", {
-        ...form,
-        loan_amount: form.credit_amount,
-        emi: 0,
-        interest_rate: 0,
-        final_decision: prediction.data.final_decision,
-        decision_result: prediction.data,
-      });
-      localStorage.setItem(`loan_decision_${saved.data.id}`, JSON.stringify(prediction.data));
-      const applicationId = prediction.data.application_id || saved.data.id;
-      navigate(`/applications/${applicationId}`, { state: prediction.data });
+      const prediction = await api.post("/ml/predict", { ...form, loan_amount: form.credit_amount, emi: 0, interest_rate: 0 });
+      const applicationId = prediction.data.application_id;
+      if (applicationId) localStorage.setItem(`loan_decision_${applicationId}`, JSON.stringify(prediction.data));
+      navigate(`/applications/${applicationId || "new"}`, { state: prediction.data });
     } catch (err) {
       setError(err.response?.data?.error || "Could not submit loan application.");
     } finally {

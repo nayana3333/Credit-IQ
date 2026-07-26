@@ -316,13 +316,14 @@ def _dual_credit_prediction(data):
     }
 
 
-def _save_application_if_authenticated(result):
+def _save_application_if_authenticated(result, raw_data=None):
     try:
         verify_jwt_in_request(optional=True)
         user_id = get_jwt_identity()
         if not user_id:
             return None
         payload = result["input_summary"]
+        raw_data = raw_data or {}
         application = CreditApplication(
             user_id=int(user_id),
             checking_status=payload.get("checking_status"),
@@ -345,6 +346,9 @@ def _save_application_if_authenticated(result):
             num_dependents=payload.get("num_dependents"),
             own_telephone=payload.get("own_telephone"),
             foreign_worker=payload.get("foreign_worker"),
+            loan_amount=raw_data.get("loan_amount", payload.get("credit_amount")),
+            emi=raw_data.get("emi", 0) or 0,
+            interest_rate=raw_data.get("interest_rate", 0) or 0,
             lr_decision=result["lr"]["decision"],
             lr_confidence=result["lr"]["confidence"],
             lr_good_prob=result["lr"]["good_probability"],
@@ -389,6 +393,9 @@ def _application_payload(item, include_shap=False):
         "num_dependents": item.num_dependents,
         "own_telephone": item.own_telephone,
         "foreign_worker": item.foreign_worker,
+        "loan_amount": item.loan_amount,
+        "emi": item.emi,
+        "interest_rate": item.interest_rate,
         "lr_decision": item.lr_decision,
         "lr_confidence": item.lr_confidence,
         "lr_good_prob": item.lr_good_prob,
@@ -414,7 +421,7 @@ def predict_credit_decision():
     if invalid:
         return invalid
     result = _dual_credit_prediction(data)
-    result["application_id"] = _save_application_if_authenticated(result)
+    result["application_id"] = _save_application_if_authenticated(result, raw_data=data)
     selected_model = data.get("model", "both")
     if selected_model in {"lr", "rf"}:
         return jsonify(

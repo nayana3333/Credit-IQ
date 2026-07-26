@@ -7,7 +7,7 @@ from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_requir
 from sqlalchemy.exc import IntegrityError, OperationalError
 
 from ..extensions import db, limiter
-from ..models import Loan, LoanDecision, User
+from ..models import CreditApplication, User
 from .ml import _dual_credit_prediction
 
 auth_bp = Blueprint("auth", __name__)
@@ -118,7 +118,7 @@ def demo_login():
         db.session.add(user)
         db.session.commit()
 
-    if not Loan.query.filter_by(user_id=user.id).first():
+    if not CreditApplication.query.filter_by(user_id=user.id).first():
         sample_applications = [
             {
                 "checking_status": "A14",
@@ -167,7 +167,7 @@ def demo_login():
         ]
         for data in sample_applications:
             decision = _dual_credit_prediction(data)
-            loan = Loan(
+            application = CreditApplication(
                 user_id=user.id,
                 loan_amount=data["credit_amount"],
                 emi=0,
@@ -176,6 +176,7 @@ def demo_login():
                 purpose=data["purpose"],
                 checking_status=data["checking_status"],
                 credit_history=data["credit_history"],
+                credit_amount=data["credit_amount"],
                 savings_status=data["savings_status"],
                 employment=data["employment"],
                 installment_rate=data["installment_rate"],
@@ -191,30 +192,20 @@ def demo_login():
                 num_dependents=data["num_dependents"],
                 own_telephone=data["own_telephone"],
                 foreign_worker=data["foreign_worker"],
-                status=decision["final_decision"],
+                lr_decision=decision["lr"]["decision"],
+                lr_confidence=decision["lr"]["confidence"],
+                lr_good_prob=decision["lr"]["good_probability"],
+                lr_bad_prob=decision["lr"]["bad_probability"],
+                rf_decision=decision["rf"]["decision"],
+                rf_confidence=decision["rf"]["confidence"],
+                rf_good_prob=decision["rf"]["good_probability"],
+                rf_bad_prob=decision["rf"]["bad_probability"],
+                final_decision=decision["final_decision"],
+                consensus=decision["consensus"],
+                lr_shap_reasons=json.dumps(decision["lr"]["shap_reasons"]),
+                rf_shap_reasons=json.dumps(decision["rf"]["shap_reasons"]),
             )
-            db.session.add(loan)
-            db.session.flush()
-            db.session.add(
-                LoanDecision(
-                    loan_id=loan.id,
-                    user_id=user.id,
-                    lr_decision=decision["lr"]["decision"],
-                    lr_confidence=decision["lr"]["confidence"],
-                    lr_good_prob=decision["lr"]["good_probability"],
-                    lr_bad_prob=decision["lr"]["bad_probability"],
-                    rf_decision=decision["rf"]["decision"],
-                    rf_confidence=decision["rf"]["confidence"],
-                    rf_good_prob=decision["rf"]["good_probability"],
-                    rf_bad_prob=decision["rf"]["bad_probability"],
-                    final_decision=decision["final_decision"],
-                    consensus=decision["consensus"],
-                    lr_shap_reasons=json.dumps(decision["lr"]["shap_reasons"]),
-                    rf_shap_reasons=json.dumps(decision["rf"]["shap_reasons"]),
-                    shap_reasons=json.dumps(decision["rf"]["shap_reasons"]),
-                    input_features=json.dumps(decision["input_summary"]),
-                )
-            )
+            db.session.add(application)
         db.session.commit()
     token = create_access_token(identity=str(user.id))
     return jsonify({"access_token": token, "user": _user_payload(user)})

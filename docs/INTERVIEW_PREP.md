@@ -52,15 +52,15 @@ flowchart TB
     subgraph Backend["Flask REST API"]
         Auth["/api/v1/auth — register, login, demo, profile"]
         ML["/api/v1/ml — predict, metrics, business-impact, simulate, batch, applications"]
-        Loans["/api/v1/loans — legacy loan + amortization endpoints"]
+        Loans["/api/v1/loans — amortization view + backward-compatible URLs, backed by CreditApplication"]
         Dash["/api/v1/dashboard — aggregate stats"]
         Assistant["/api/v1/assistant/chat — AI advisor"]
     end
     subgraph ML_Layer["ML Artifacts (pickled at train time)"]
-        Models["logistic_model.pkl, random_forest_model.pkl, scaler.pkl, label_encoders.pkl, feature_names.pkl, model_metrics.pkl, X_train_sample.pkl"]
+        Models["logistic_model.pkl, random_forest_model.pkl, xgboost_model.pkl (benchmark), scaler.pkl, label_encoders.pkl, feature_names.pkl, model_metrics.pkl, X_train_sample.pkl"]
     end
     subgraph DB["Database (SQLite locally / Postgres in prod)"]
-        Tables["User, Loan, CreditApplication, LoanDecision"]
+        Tables["User, CreditApplication (single consolidated table)"]
     end
 
     UI -->|axios, JWT bearer token| Auth
@@ -233,13 +233,27 @@ Schema is managed by real Alembic migrations (`backend/migrations/`, via Flask-M
 
 **Why this is a good answer**: it's not just "I added Alembic" — it shows the two things that actually matter when retrofitting migrations onto an existing schema: generating the initial migration against an empty baseline (the single most common mistake), and validating the fresh-clone path actually works rather than assuming it does because the already-migrated dev database kept working.
 
-### `backend/app/models.py` — the 4 tables
-- **`User`**: id, name, email (unique), password_hash, created_at.
-- **`Loan`**: an older, general-purpose loan table — has both simple fields (`loan_amount`, `emi`, `interest_rate`) *and* (added later via the ALTER TABLE migration) the full set of German-Credit-style fields, for backward compatibility with `/api/v1/loans`.
-- **`CreditApplication`**: the newer, primary table — every German Credit field **plus** both models' decisions/confidences/probabilities/SHAP-reasons-as-JSON-text, in one row. This is what `/api/v1/ml/predict` writes to and what `/api/v1/ml/applications` reads from.
-- **`LoanDecision`**: a 1:1 side table linked to `Loan` (`db.relationship(...backref="decision")`), storing the same kind of decision data as `CreditApplication` but tied to the older `Loan` table instead. Used by `/api/v1/loans/<id>/decision`.
+### The schema-consolidation story (merging `Loan`+`LoanDecision` into `CreditApplication`)
 
-**Known duplication** (good self-critique talking point, see Part 12): `CreditApplication` and the `Loan`+`LoanDecision` pair store overlapping data because the schema evolved — the app grew a cleaner unified table but kept the old one for the `/loans` routes and frontend paths (`/loans/*` still works as an alias alongside `/applications/*` in [App.jsx](../frontend/src/App.jsx)).
+**Situation**: the app had two parallel tables doing almost the same job. `CreditApplication` was the newer, primary table `/ml/predict` wrote to; `Loan`+`LoanDecision` was an older pair kept alive only for the `/loans/*` routes and URL aliases. Concretely, every single loan submission from the UI was doing **two separate writes** for one logical event: `LoanForm.jsx` called `/ml/predict` (writes a `CreditApplication` row) and then immediately called `POST /loans` (writes a `Loan`+`LoanDecision` row pair) with essentially the same data. Worse, `Applications.jsx` always navigated to `/applications/:id` regardless of which table a row came from, which meant IDs from the `Loan` table's namespace could 404 — a latent bug from the two tables not sharing one ID space.
+
+**Action**:
+1. Added `loan_amount`/`emi`/`interest_rate` columns to `CreditApplication` (the only fields `Loan` had that `CreditApplication` didn't) and deleted the `Loan`/`LoanDecision` model classes entirely.
+2. Rewrote `loans.py` to be a thin, read-only, backward-compatible view over `CreditApplication` — `GET /loans` and `GET /loans/<id>/decision` still work (so the frontend's `/loans/*` URL aliases in `App.jsx` don't break), but `POST /loans` was removed since `/ml/predict` now persists everything in one write.
+3. Rewrote `dashboard.py` to drop its dual-source fallback logic (previously: prefer `CreditApplication`, fall back to `Loan`/`LoanDecision`) since there's only one source now.
+4. Rewrote `auth.py`'s `/demo` seeding endpoint, which used to create `Loan`+`LoanDecision` rows, to create `CreditApplication` rows instead.
+5. Simplified `LoanForm.jsx`'s submit handler from two sequential API calls down to one — eliminating the redundant write entirely, not just hiding it.
+6. Generated a real Alembic migration (`flask db migrate`) that autogenerate correctly detected as: drop `loan`, drop `loan_decisions`, add 3 columns to `credit_applications` — exactly the intended diff, nothing more.
+
+**Verification**: added 4 new backend tests covering the paths that had zero prior coverage (`/loans` GET, `/loans/<id>/decision`, and `/auth/demo` — none of which any existing test exercised before this change), all passing alongside the full existing suite (32/32). Then verified live in a real browser session end-to-end: logged in, submitted a new loan application through the actual multi-step form, confirmed it created exactly one record with a single `/ml/predict` network call (not two), confirmed the resulting `/applications/:id` decision report rendered correctly, confirmed the `/loans/:id` backward-compatible URL alias still resolved to the same data, and confirmed the Applications list and Dashboard pages still worked — zero console errors, every network request 200 OK.
+
+**Why this is a good answer**: it's a real production-style refactor story — identifying data duplication caused by incremental schema evolution, tracing it all the way through to a concrete bug it was causing (the ID-namespace mismatch), fixing it end-to-end across the model/routes/frontend instead of just patching one layer, and verifying the riskiest kind of change (dropping tables) thoroughly rather than trusting that green tests alone prove a UI flow still works.
+
+### `backend/app/models.py` — 2 tables (consolidated from 4)
+- **`User`**: id, name, email (unique), password_hash, created_at.
+- **`CreditApplication`**: the single table for every credit decision — every German Credit field, both models' decisions/confidences/probabilities/SHAP-reasons-as-JSON-text, **and** `loan_amount`/`emi`/`interest_rate` (added in the consolidation, see Part 9's second migration story) for the amortization/EMI display the old `Loan` table used to own. `/api/v1/ml/predict` writes here; `/api/v1/ml/applications`, `/api/v1/loans`, and `/api/v1/loans/<id>/decision` all read from here now.
+
+There used to be a `Loan`+`LoanDecision` pair duplicating most of this — see the consolidation story below for why and how that was merged away.
 
 ### `backend/app/finance.py` — pure math utilities, mostly independent of ML
 - `to_decimal`/`money`: safe decimal parsing/rounding for currency (`Decimal` avoids float rounding errors in money math).
@@ -272,7 +286,7 @@ Notice `/predict`, `/metrics`, `/business-impact`, `/simulate`, `/batch` have **
 - Rate-limit errors return a friendly 429 JSON via `@auth_bp.errorhandler(429)`.
 
 ### `backend/app/routes/loans.py`
-Legacy/parallel path to `ml.py`'s `CreditApplication` flow, operating on `Loan`+`LoanDecision`. Adds EMI/amortization display fields via `finance.py` helpers that `CreditApplication` doesn't need (since `CreditApplication` doesn't track a real repayment schedule, just the credit-risk decision).
+Now a thin, backward-compatible view over `ml.py`'s `CreditApplication` table (previously a legacy parallel path over `Loan`+`LoanDecision` — see the consolidation story in Part 9). `_loan_payload()` adds EMI/amortization display fields via `finance.py` helpers, falling back to `credit_amount` when `loan_amount` wasn't explicitly set. `GET /loans` and `GET /loans/<id>/decision` exist so the frontend's `/loans/*` URL aliases keep working with zero frontend changes; there's no more `POST /loans` — `/ml/predict` persists everything in one write now.
 
 ### `backend/app/routes/assistant.py`
 - If `OPENAI_API_KEY` isn't set, immediately returns a friendly message telling the user to configure it — never crashes.
@@ -281,7 +295,7 @@ Legacy/parallel path to `ml.py`'s `CreditApplication` flow, operating on `Loan`+
 - **If the OpenAI call throws for any reason** (bad key, network, rate limit, quota) — falls back to `_fallback_reply`, a simple keyword-matching rule engine (checks for "shap", "emi"/"loan"/"approval", "roc"/"auc"/"confusion") that gives a canned but genuinely useful explanation, so the Assistant page never breaks even with zero API budget. This dual-path design (best-effort live LLM + guaranteed local fallback) is a good "resilience/graceful degradation" talking point.
 
 ### `backend/app/routes/dashboard.py`
-Aggregates counts (approved/rejected/pending/consensus rate) — **prefers `CreditApplication` records if any exist**, otherwise falls back to the older `Loan`/`LoanDecision` pair, so the dashboard works correctly regardless of which flow was used to create the data. Also reads `model_metrics.pkl` directly to surface RF's training accuracy as a headline dashboard number.
+Aggregates counts (approved/rejected/pending/consensus rate) directly from `CreditApplication` — no more dual-source fallback logic now that `Loan`/`LoanDecision` are gone. Also reads `model_metrics.pkl` directly to surface RF's training accuracy as a headline dashboard number.
 
 ### `backend/train_models.py`
 The script you run once (`python train_models.py`) to (re)produce all the `.pkl` artifacts `ml.py` loads at import time. Walk-through:
@@ -487,7 +501,7 @@ This one has two acts, and telling both is what makes it strong.
 38. **Why write a custom AST evaluator instead of using `eval()`?** → `eval()` on user input is a code-injection vector (arbitrary Python execution); the AST walker only permits numeric literals and `+ - * / **`, rejecting anything else by construction.
 
 ### Self-awareness / "what would you improve" (see Part 12 for the full list)
-39. **What's the biggest design flaw you'd fix first?** → The `Loan`/`LoanDecision` vs `CreditApplication` duplication.
+39. **What's the biggest design flaw you'd fix first?** → This one's already fixed — see the schema-consolidation story (Part 5/9): `Loan`/`LoanDecision` were merged into `CreditApplication`, verified with new tests and a live end-to-end browser check. If asked what's next after that: the business-impact rupee figures are still illustrative, not calibrated (item below).
 40. **What's missing for this to be truly production-ready?** → Part 8, verbatim.
 
 ### Curveball / stretch questions
@@ -524,12 +538,13 @@ This one has two acts, and telling both is what makes it strong.
 
 ## Part 12 — Known Limitations & What You'd Improve (Say This Proactively)
 
-1. **`Loan`+`LoanDecision` vs `CreditApplication` duplication** — the schema evolved from a general "loan" model to a cleaner unified `CreditApplication`, but the old tables/routes were kept for backward compatibility with `/loans/*` URLs. Next step: migrate fully to one table and deprecate the old routes.
-2. **`finance.py`'s `decision_support`/`score_from_finances`/`safe_calculate` are currently unused** by any live route — leftover from an earlier rule-based (non-ML) design direction. Would either wire them into a real feature (e.g., an "affordability calculator" separate from the credit-risk model) or remove them.
-3. **Business-impact rupee figures are illustrative placeholders**, not calibrated from real recovery-rate/margin data — explicitly noted in the API and README.
-4. **No pagination** on `/ml/applications` — fine at demo scale, would need it in production.
-5. **Backend not fully deployed alongside the frontend** — the Vercel frontend preview needs a live backend URL via `VITE_API_BASE_URL` to be a fully working public demo (this is the single highest-leverage next step for showing this off in interviews).
-6. **No automated model retraining/versioning pipeline** — training is a manual `python train_models.py` step today.
+1. **`finance.py`'s `decision_support`/`score_from_finances`/`safe_calculate` are currently unused** by any live route — leftover from an earlier rule-based (non-ML) design direction. Would either wire them into a real feature (e.g., an "affordability calculator" separate from the credit-risk model) or remove them.
+2. **Business-impact rupee figures are illustrative placeholders**, not calibrated from real recovery-rate/margin data — explicitly noted in the API and README.
+3. **No pagination** on `/ml/applications` — fine at demo scale, would need it in production.
+4. **Backend not fully deployed alongside the frontend** — the Vercel frontend preview needs a live backend URL via `VITE_API_BASE_URL` to be a fully working public demo (this is the single highest-leverage next step for showing this off in interviews).
+5. **No automated model retraining/versioning pipeline** — training is a manual `python train_models.py` step today.
+
+*(The `Loan`/`LoanDecision` vs `CreditApplication` duplication — previously the top item here — is fixed; see the schema-consolidation story in Part 5/9.)*
 
 *(Real DB migrations were the one item on this list already fixed — see Part 5/Part 9's migration story.)*
 
