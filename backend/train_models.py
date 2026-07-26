@@ -8,7 +8,8 @@ from pandas.api.types import is_numeric_dtype
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from xgboost import XGBClassifier
-from sklearn.metrics import accuracy_score, confusion_matrix, f1_score, precision_score, recall_score, roc_auc_score, roc_curve
+from sklearn.calibration import calibration_curve
+from sklearn.metrics import accuracy_score, brier_score_loss, confusion_matrix, f1_score, precision_score, recall_score, roc_auc_score, roc_curve
 from sklearn.model_selection import GridSearchCV, cross_val_score, train_test_split
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
@@ -165,12 +166,16 @@ def tune(name, estimator, X, y):
 def evaluate(name, model, X_test, y_test, probabilities, feature_names):
     pred = model.predict(X_test)
     fpr, tpr, _ = roc_curve(y_test, probabilities)
+    # quantile bins (not fixed-width) so bins stay populated on a ~200-row test set
+    prob_true, prob_pred = calibration_curve(y_test, probabilities, n_bins=5, strategy="quantile")
     metric = {
         "accuracy": float(accuracy_score(y_test, pred)),
         "precision": float(precision_score(y_test, pred, zero_division=0)),
         "recall": float(recall_score(y_test, pred, zero_division=0)),
         "f1": float(f1_score(y_test, pred, zero_division=0)),
         "roc_auc": float(roc_auc_score(y_test, probabilities)),
+        "brier_score": float(brier_score_loss(y_test, probabilities)),
+        "calibration_curve": {"prob_true": prob_true.tolist(), "prob_pred": prob_pred.tolist()},
         "confusion_matrix": confusion_matrix(y_test, pred).tolist(),
         "roc_fpr": fpr.tolist(),
         "roc_tpr": tpr.tolist(),

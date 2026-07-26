@@ -67,3 +67,29 @@ def test_lr_roc_auc_above_threshold():
     assert metrics["lr"]["roc_auc"] > 0.70, (
         f"LR ROC-AUC dropped to {metrics['lr']['roc_auc']}, below 0.70."
     )
+
+
+def test_calibration_metrics_present_for_all_models():
+    """Brier score + reliability-curve data should exist for every model so
+    the Analytics 'Calibration' tab always has something to render, and so
+    a future retrain can't silently drop these fields."""
+    metrics = _load_metrics()
+    for key in ["lr", "rf", "xgb"]:
+        assert "brier_score" in metrics[key], f"{key} missing brier_score"
+        assert 0 <= metrics[key]["brier_score"] <= 1
+        assert "calibration_curve" in metrics[key], f"{key} missing calibration_curve"
+        assert len(metrics[key]["calibration_curve"]["prob_true"]) > 0
+
+
+def test_rf_better_calibrated_than_lr():
+    """Documents a real, expected side effect: LR's class_weight='balanced'
+    improves recall (see test_lr_recall_above_threshold) but distorts
+    probability calibration - a well-known tradeoff of class reweighting.
+    RF is trained unweighted and should stay better calibrated (lower
+    Brier score = better) as a result."""
+    metrics = _load_metrics()
+    assert metrics["rf"]["brier_score"] < metrics["lr"]["brier_score"], (
+        "Expected RF (unweighted) to be better calibrated than LR "
+        "(class_weight='balanced') - if this flips, the calibration story "
+        "in the README/interview prep needs revisiting, not just this test."
+    )

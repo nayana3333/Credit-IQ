@@ -106,7 +106,7 @@ flowchart TB
 | **Flask-Limiter** | Rate limiting (5 login attempts/min) to slow brute-force attacks | What rate limiting is, why `key_func=get_remote_address` (per-IP) |
 | **Flask-CORS** | Lets the React frontend (different origin/port) call this API | Same-origin policy, why browsers block cross-origin requests by default |
 | **SQLite / PostgreSQL** | Local dev DB / production DB (switch via `DATABASE_URL` env var) | SQL basics: SELECT/INSERT/foreign keys/indexes |
-| **scikit-learn** | Trains and runs the Logistic Regression + Random Forest models | `fit`/`predict`/`predict_proba`, `train_test_split`, `StandardScaler`, `GridSearchCV` |
+| **scikit-learn** | Trains and runs the Logistic Regression + Random Forest models | `fit`/`predict`/`predict_proba`, `train_test_split`, `StandardScaler`, `GridSearchCV`, `calibration_curve`, `brier_score_loss` |
 | **pandas / numpy** | Data wrangling — building the feature DataFrame per request | DataFrame basics, `.map()`, dtypes |
 | **SHAP** | Explains individual predictions — which features pushed the score which way | `LinearExplainer` vs `TreeExplainer`, what a Shapley value is conceptually |
 | **marshmallow** | Validates every incoming credit-application payload (`/predict`, `/simulate`, `/batch`, `/loans`) before it touches the model | `Schema.from_dict()`, `fields.Integer/Float/Str`, `validate.Range`/`validate.OneOf`, catching `ValidationError` |
@@ -353,7 +353,9 @@ Handles **two different data shapes** depending on how you arrived here:
 Renders side-by-side `ModelCard`s for LR/RF, two `SHAPChart`s, the full input summary, and contextual "risk actions" (what to improve, pulled from the top negative SHAP factors). Buttons hand off to the Simulation page (pre-filling the same inputs via `localStorage`) or the Assistant page (passing the application id as context).
 
 ### `frontend/src/pages/Analytics.jsx`
-Five tabs backed by one `/ml/metrics` fetch (plus a separate `/ml/business-impact` fetch only when the "Business Impact" tab is active, re-fetched whenever the threshold slider moves). Uses Recharts: `RadarChart` for the 5-metric LR-vs-RF comparison, `LineChart` for ROC curves (with a dashed "no-skill baseline" reference line), a manual 2×2 grid for confusion matrices, horizontal `BarChart`s for RF feature importances / LR coefficients (color-coded red/grey by sign for LR). Has hardcoded `fallback` metrics so the page still renders something sensible if the API call fails (e.g., during a cold demo without a trained model yet).
+Six tabs backed by one `/ml/metrics` fetch (plus a separate `/ml/business-impact` fetch only when the "Business Impact" tab is active, re-fetched whenever the threshold slider moves). Uses Recharts: `RadarChart` for the metric comparison, `LineChart` for ROC curves (with a dashed "no-skill baseline" reference line), a manual 2×2 grid for confusion matrices, horizontal `BarChart`s for RF feature importances / LR coefficients (color-coded red/grey by sign for LR). Has hardcoded `fallback` metrics so the page still renders something sensible if the API call fails (e.g., during a cold demo without a trained model yet).
+
+**Calibration tab**: a reliability diagram — one `LineChart`, but each model's `<Line>` gets its *own* `data` prop (Recharts lets a `Line` override the parent chart's shared data), since each model's quantile bins sit at different x-positions. Plotted as predicted probability (x) vs actual fraction positive (y), with a dashed diagonal reference line for "perfectly calibrated." Brier scores shown as stat cards above the chart. See the calibration story in Part 9 for what the actual result means.
 
 ### `frontend/src/pages/Simulation.jsx`
 Two things at once: (1) an interactive form that calls `/ml/predict` on demand ("Predict now" button) so you can test one specific hypothetical applicant, and (2) an automatic sensitivity chart that calls `/ml/simulate` (varying one chosen field like `credit_amount` across a preset range) every time you change the "vary" dropdown or get a new base prediction, plotting both models' approval probability as a line chart across that range.
@@ -443,6 +445,18 @@ This one has two acts, and telling both is what makes it strong.
 
 **Why this is your best answer**: it demonstrates the full arc — benchmark honestly, don't declare a winner prematurely, tune systematically, and then make a *documented, reasoned* production choice even when the "objectively best" model is genuinely a toss-up. That's a materially more sophisticated answer than "we picked RF because it had the highest accuracy," and it pre-empts nearly every possible follow-up question about model selection methodology.
 
+### The calibration story (a second ML-depth talking point, and it ties directly back to the imbalance story)
+
+**The question this answers**: "ROC-AUC/accuracy/recall don't tell you everything — did you check whether the model's actual probabilities mean anything?" Most candidates have never checked this. You have.
+
+**What was measured**: `sklearn.calibration.calibration_curve` (quantile-binned — not fixed-width — since the test set is only ~200 rows and fixed-width bins would end up nearly empty at the extremes) and Brier score (mean squared error between predicted probability and actual outcome; 0 = perfect, 0.25 = a coin flip's worth of information). Both are shown live in the Analytics "Calibration" tab, backed by `evaluate()` in `train_models.py`.
+
+**The result**: LR scores 0.195 Brier, RF 0.157, XGBoost 0.156. LR's reliability curve sits **consistently above the diagonal** — it is measurably overconfident, predicting higher bad-credit probabilities than actually occur across every bin.
+
+**Why, and why this is not a new problem — it's the same root cause as the imbalance story**: LR trains with `class_weight="balanced"` specifically to raise its recall on bad-credit applicants (Part 9's imbalance story). Reweighting the loss function during training shifts the decision boundary on purpose — that's the whole point — but as a side effect it also distorts the model's probability *calibration*, because the model is no longer estimating the true P(bad credit | features), it's estimating a reweighted version of it. This is a well-documented tradeoff of class-weighting/resampling techniques in the ML literature, not something specific to this project or a sign of a bug. RF and XGBoost, trained unweighted, calibrate noticeably better as a direct consequence.
+
+**Why this is a strong answer**: it connects three separate pieces of work into one coherent story instead of three isolated facts — the imbalance fix, the calibration check, and the "why RF stays the production model" decision all reinforce each other. It also demonstrates you understand that ROC-AUC, accuracy, and recall are all about *ranking/classification* quality, while calibration is a genuinely separate axis that none of those metrics can tell you about — and that a model's displayed "confidence %" is not automatically a trustworthy probability just because the model classifies well.
+
 ---
 
 ## Part 10 — Interview Question Bank (0 → 100)
@@ -470,6 +484,7 @@ This one has two acts, and telling both is what makes it strong.
 13. **Why might accuracy be misleading here?** → Class imbalance (roughly 70% good / 30% bad in German Credit) — a model that always predicts "good" would already score ~70% accuracy while being useless.
 14. **What's a confusion matrix, and how did you use it beyond just reporting it?** → Fed directly into the business-impact cost calculation (Part 7).
 15. **What is cross-validation, and why 5-fold specifically?** → Part 4. 5 is a common default balancing compute cost vs. estimate stability; not a hard rule.
+15b. **What is probability calibration, and did you check it?** → See the calibration story above (Part 9). ROC-AUC/accuracy/recall measure ranking/classification quality; calibration measures whether a "70% confidence" prediction is actually right ~70% of the time — a separate axis entirely. Checked via `calibration_curve` (quantile-binned) and Brier score. LR (0.195 Brier) is measurably overconfident due to `class_weight="balanced"`; RF (0.157) and XGBoost (0.156) are well-calibrated since they're trained unweighted.
 
 ### Explainability
 16. **What is SHAP, in plain English?** → Part 4. Attributes how much each feature pushed a specific prediction away from the average, based on Shapley values from cooperative game theory (conceptual explanation is enough — you don't need the exact math for most interviews, but know it's game-theory-derived and additive: feature impacts + baseline = final prediction).
@@ -528,6 +543,7 @@ This one has two acts, and telling both is what makes it strong.
 - LR: 71.5% accuracy, 51.8% precision, 73.3% recall, 60.7% F1, 0.7931 ROC-AUC (tuned `C=0.01`, trained with `class_weight="balanced"`).
 - XGBoost (benchmark only, not in production): 76.5% accuracy, 63.3% precision, 51.7% recall, 56.9% F1, 0.8077 ROC-AUC (tuned: `learning_rate=0.1, max_depth=3, n_estimators=100`) — untuned it lost to RF; tuned, it's a statistical tie with RF on ROC-AUC.
 - All three tuned via 5-fold `GridSearchCV` scored on ROC-AUC.
+- Calibration (Brier score, lower is better): LR 0.195 (overconfident — `class_weight="balanced"` distorts calibration as a side effect of improving recall), RF 0.157, XGBoost 0.156 (both well-calibrated, trained unweighted).
 - Encoding fix impact: RF accuracy 77.5% → 79.5%, ROC-AUC 0.78 → 0.79.
 - Class-imbalance fix impact: LR recall on bad-credit applicants 53.3% → 73.3% after `class_weight="balanced"`, while ROC-AUC stayed ~flat (0.7905 → 0.7908) — proof the boundary shifted, not the model's underlying discriminative power. RF's recall got *worse* under the same weighting, so RF was kept unweighted and its tradeoff is controlled via threshold tuning instead (Part 7).
 - Business assumptions: ₹35,000 avg loan, ₹14,000/missed-default, ₹2,500/wrongly-rejected-customer.

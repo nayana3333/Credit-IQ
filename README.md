@@ -115,6 +115,23 @@ LR/RF purely as a comparison point - it is not wired into the live
 prediction routes. The benchmark is shown in the Analytics page (Model
 Performance, ROC Curves, and Confusion Matrices tabs) for transparency.
 
+**Probability calibration**: a model can rank applicants well (high
+ROC-AUC) while its raw probabilities are miscalibrated - i.e. a "70%
+confidence" prediction doesn't actually turn out right 70% of the time.
+Checked via `sklearn.calibration.calibration_curve` (quantile-binned
+reliability diagram, shown in the Analytics "Calibration" tab) and Brier
+score (lower is better; 0 = perfect, 0.25 = a coin flip): LR scores 0.195,
+RF 0.157, XGBoost 0.156. LR is measurably **overconfident** - its
+reliability curve sits consistently above the diagonal, predicting higher
+bad-credit probabilities than actually occur. This is a real, expected side
+effect of `class_weight="balanced"` (used to improve LR's recall, see
+above): reweighting the loss shifts the decision boundary and distorts
+calibration. RF and XGBoost, trained unweighted, track the diagonal more
+closely. Practical implication: LR's displayed "confidence %" is
+directionally useful but shouldn't be read as a literal probability - RF's
+better-calibrated confidence is one more reason it stays the production
+model.
+
 ## Explainability Validation
 
 SHAP values are an approximation of feature contribution, not ground truth.

@@ -4,7 +4,7 @@ import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Radar, Rad
 import { api, setAuthToken } from "../api";
 import { FEATURE_LABELS, percent } from "../creditFeatures";
 
-const tabs = ["Model Performance", "ROC Curves", "Confusion Matrices", "Feature Importance", "Business Impact"];
+const tabs = ["Model Performance", "ROC Curves", "Confusion Matrices", "Feature Importance", "Calibration", "Business Impact"];
 const metricKeys = ["accuracy", "precision", "recall", "f1", "roc_auc"];
 const metricLabels = { accuracy: "Accuracy", precision: "Precision", recall: "Recall", f1: "F1-Score", roc_auc: "ROC-AUC" };
 const money = (value) => `₹${Number(value || 0).toLocaleString("en-IN")}`;
@@ -47,9 +47,9 @@ export default function Analytics() {
   }, [active, selectedThreshold]);
 
   const fallback = {
-    lr: { accuracy: 0.765, precision: 0.627, recall: 0.533, f1: 0.577, roc_auc: 0.79, confusion_matrix: [[121, 19], [28, 32]], coefficients: {} },
-    rf: { accuracy: 0.775, precision: 0.703, recall: 0.433, f1: 0.536, roc_auc: 0.78, confusion_matrix: [[129, 11], [34, 26]], feature_importances: {} },
-    xgb: { accuracy: 0.75, precision: 0.593, recall: 0.533, f1: 0.561, roc_auc: 0.78, confusion_matrix: [[122, 18], [28, 32]], feature_importances: {} },
+    lr: { accuracy: 0.765, precision: 0.627, recall: 0.533, f1: 0.577, roc_auc: 0.79, confusion_matrix: [[121, 19], [28, 32]], coefficients: {}, brier_score: 0.195, calibration_curve: { prob_true: [0.075, 0.1, 0.25, 0.45, 0.625], prob_pred: [0.227, 0.355, 0.461, 0.586, 0.756] } },
+    rf: { accuracy: 0.775, precision: 0.703, recall: 0.433, f1: 0.536, roc_auc: 0.78, confusion_matrix: [[129, 11], [34, 26]], feature_importances: {}, brier_score: 0.157, calibration_curve: { prob_true: [0.075, 0.125, 0.225, 0.4, 0.675], prob_pred: [0.082, 0.182, 0.278, 0.41, 0.598] } },
+    xgb: { accuracy: 0.75, precision: 0.593, recall: 0.533, f1: 0.561, roc_auc: 0.78, confusion_matrix: [[122, 18], [28, 32]], feature_importances: {}, brier_score: 0.156, calibration_curve: { prob_true: [0.05, 0.15, 0.175, 0.45, 0.675], prob_pred: [0.047, 0.116, 0.224, 0.415, 0.708] } },
     roc_curves: { lr: { fpr: [0, 0.12, 0.35, 1], tpr: [0, 0.45, 0.76, 1] }, rf: { fpr: [0, 0.1, 0.32, 1], tpr: [0, 0.4, 0.78, 1] }, xgb: { fpr: [0, 0.14, 0.38, 1], tpr: [0, 0.42, 0.72, 1] } },
   };
   const data = metrics || fallback;
@@ -69,6 +69,16 @@ export default function Analytics() {
       baseline: lr.fpr[index] ?? rf.fpr[index] ?? 0,
     }));
   }, [data]);
+
+  const calibrationSeries = (key) => {
+    const curve = data[key]?.calibration_curve;
+    if (!curve) return [];
+    return curve.prob_pred.map((x, index) => ({ prob_pred: x, prob_true: curve.prob_true[index] }));
+  };
+  const lrCalibration = calibrationSeries("lr");
+  const rfCalibration = calibrationSeries("rf");
+  const xgbCalibration = calibrationSeries("xgb");
+  const calibrationDiagonal = [{ prob_pred: 0, prob_true: 0 }, { prob_pred: 1, prob_true: 1 }];
 
   const rfFeatures = Object.entries(data.rf?.feature_importances || {}).slice(0, 10).map(([feature, value]) => ({ feature: FEATURE_LABELS[feature] || feature, value }));
   const lrFeatures = Object.entries(data.lr?.coefficients || {}).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 10).map(([feature, value]) => ({ feature: FEATURE_LABELS[feature] || feature, value }));
@@ -167,6 +177,49 @@ export default function Analytics() {
         <div className="rounded-lg border border-[#E5E5E5] bg-white p-5"><h3 className="font-semibold">Random Forest - Feature Importance</h3><ResponsiveContainer width="100%" height={360}><BarChart data={rfFeatures} layout="vertical"><CartesianGrid strokeDasharray="3 3" /><XAxis type="number" /><YAxis type="category" dataKey="feature" width={150} /><Tooltip /><Bar dataKey="value" fill="#2563EB" /></BarChart></ResponsiveContainer></div>
         <div className="rounded-lg border border-[#E5E5E5] bg-white p-5"><h3 className="font-semibold">Logistic Regression - Coefficients</h3><ResponsiveContainer width="100%" height={360}><BarChart data={lrFeatures} layout="vertical"><CartesianGrid strokeDasharray="3 3" /><XAxis type="number" /><YAxis type="category" dataKey="feature" width={150} /><Tooltip /><Bar dataKey="value">{lrFeatures.map((item) => <Cell key={item.feature} fill={item.value >= 0 ? "#D4D4D4" : "#F97316"} />)}</Bar></BarChart></ResponsiveContainer></div>
       </div>}
+
+      {active === "Calibration" && (
+        <div className="space-y-5">
+          <div>
+            <h2 className="text-xl font-semibold text-[#111111]">Probability calibration</h2>
+            <p className="mt-1 text-sm text-[#737373]">Does a "70% confidence" prediction actually turn out right ~70% of the time? A model can rank applicants well (high ROC-AUC) while its raw probabilities are miscalibrated.</p>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-3">
+            {[["lr", "Logistic Regression", "#2563EB"], ["rf", "Random Forest", "#F97316"], ["xgb", "XGBoost (benchmark)", "#16A34A"]].map(([key, label, color]) => (
+              (key !== "xgb" || hasXgb) && (
+                <div key={key} className="rounded-lg border border-[#E5E5E5] bg-white p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#737373]">{label}</p>
+                  <p className="mt-3 text-2xl font-semibold" style={{ color }}>{Number(data[key]?.brier_score ?? 0).toFixed(3)}</p>
+                  <p className="mt-1 text-xs text-[#737373]">Brier score (lower is better; 0 = perfect, 0.25 = a coin flip)</p>
+                </div>
+              )
+            ))}
+          </div>
+
+          <div className="rounded-lg border border-[#E5E5E5] bg-white p-5">
+            <ResponsiveContainer width="100%" height={380}>
+              <LineChart>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="prob_pred" type="number" domain={[0, 1]} name="Predicted probability" tickFormatter={(v) => `${Math.round(v * 100)}%`} />
+                <YAxis dataKey="prob_true" type="number" domain={[0, 1]} name="Actual fraction positive" tickFormatter={(v) => `${Math.round(v * 100)}%`} />
+                <Tooltip formatter={(value) => `${(value * 100).toFixed(1)}%`} />
+                <Legend />
+                <Line data={calibrationDiagonal} dataKey="prob_true" stroke="#9ca3af" strokeDasharray="5 5" dot={false} name="Perfectly calibrated" />
+                <Line data={lrCalibration} dataKey="prob_true" stroke="#2563EB" strokeWidth={3} dot={{ r: 4 }} name="Logistic Regression" />
+                <Line data={rfCalibration} dataKey="prob_true" stroke="#F97316" strokeWidth={3} dot={{ r: 4 }} name="Random Forest" />
+                {hasXgb && <Line data={xgbCalibration} dataKey="prob_true" stroke="#16A34A" strokeWidth={3} dot={{ r: 4 }} name="XGBoost (benchmark)" />}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          <section className="border-l-4 border-[#111111] bg-[#F8F9FA] p-4">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#111111]">Key insight</p>
+            <p className="mt-2 text-sm leading-6 text-[#111111]">Logistic Regression's line sits consistently above the diagonal - it is <strong>overconfident</strong>, predicting higher bad-credit probabilities than actually occur. This is a real, expected side effect of training LR with <code>class_weight=&quot;balanced&quot;</code> (used to improve recall on bad-credit applicants): reweighting the loss shifts the decision boundary and distorts probability calibration. Random Forest and XGBoost, trained unweighted, track the diagonal more closely and have lower Brier scores.</p>
+            <p className="mt-3 text-xs italic text-[#6B7280]">Practical implication: LR's "confidence %" shown elsewhere in this app is directionally useful but shouldn't be read as a literal probability. RF's confidence is the more calibrated of the two - one more reason it stays the production model for the final decision.</p>
+          </section>
+        </div>
+      )}
 
       {active === "Business Impact" && (
         <div className="space-y-5">
