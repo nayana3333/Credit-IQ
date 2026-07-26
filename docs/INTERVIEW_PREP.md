@@ -87,7 +87,7 @@ flowchart TB
    - `_credit_model_result` turns each model's probability into `approved`/`rejected` + confidence, and calls `_fallback_reasons` to get the top-5 SHAP factors.
    - `_dual_credit_prediction` bundles LR + RF results; **Random Forest's decision becomes the `final_decision`** (it's the model chosen as primary, since RF had the higher accuracy in training).
    - `_save_application_if_authenticated` silently saves a `CreditApplication` row **only if** the request carries a valid JWT (auth is *optional* here — anonymous predictions still work, they just aren't persisted).
-4. Frontend also calls `POST /api/v1/loans` to log a `Loan` record with the decision, then navigates to `/applications/:id`.
+4. Frontend navigates to `/applications/:id` using the `application_id` the predict response already returned — no second write (see Part 9's schema-consolidation story for why there used to be one).
 5. [LoanDecision.jsx](../frontend/src/pages/LoanDecision.jsx) renders both models' confidence bars, two `SHAPChart` explanation charts, and follow-up actions (run simulation, ask advisor).
 
 ---
@@ -330,7 +330,9 @@ The script you run once (`python train_models.py`) to (re)produce all the `.pkl`
 Standard Vite/React entry point — mounts `<App />` into the DOM, wrapped in `<BrowserRouter>`.
 
 ### `frontend/src/App.jsx`
-Defines every route with `react-router-dom` v6. `Protected` is a simple wrapper component: if there's no `token` in `localStorage`, redirect to `/login`; otherwise render the page inside `AppLayout` (sidebar + content). Note `/applications` and `/loans` point to the *same* `Applications` component — evidence of the same old/new naming duplication mentioned earlier, kept so both URL styles work.
+Defines every route with `react-router-dom` v6. `Protected` is a simple wrapper component: if there's no `token` in `localStorage`, redirect to `/login`; otherwise render the page inside `AppLayout` (sidebar + content), wrapped in a `<Suspense>` boundary. Note `/applications` and `/loans` point to the *same* `Applications` component — evidence of the same old/new naming duplication mentioned earlier, kept so both URL styles work.
+
+**Code-splitting**: every page behind `Protected` (`Dashboard`, `Applications`, `LoanForm`, `LoanDecision`, `Analytics`, `Simulation`, `Assistant`, `BatchPredict`, `Profile`) is loaded via `React.lazy(() => import(...))` instead of a static import, so each becomes its own JS chunk fetched only when that route is visited. `Login`/`Register` stay eager imports since an unauthenticated user needs one of them immediately — no benefit to splitting the very first thing every visitor loads. This dropped the main bundle from ~729KB to ~225KB (gzipped ~209KB → ~75KB), with the rest split into small per-route chunks (the largest being `recharts`'s own `LineChart` chunk at ~385KB, shared across whichever chart-using pages need it). Verified live in the browser: clicked through all 8 lazy routes post-login, zero console errors, each rendered its real data correctly.
 
 ### `frontend/src/api.js`
 One shared `axios` instance with `baseURL` from `VITE_API_BASE_URL` (falls back to relative `/api/v1` for same-origin deployment). A **response interceptor** watches every API call: if it gets back `401` (unauthorized) or `422` (invalid JWT), it clears the stored token/user and fires a custom `auth-changed` event so the rest of the app can react (e.g., redirect to login) without every single API call needing its own error-handling boilerplate. `setAuthToken` sets/clears the `Authorization: Bearer <token>` header globally.
@@ -481,6 +483,7 @@ This one has two acts, and telling both is what makes it strong.
 25. **Walk me through what happens when a request hits `/ml/predict`.** → Part 2's request lifecycle, verbatim.
 26. **How does the frontend know if the user is logged in?** → JWT stored in `localStorage`, checked by the `Protected` wrapper in `App.jsx`; axios interceptor watches for 401/422 to auto-logout.
 27. **Why is `/ml/predict` not behind auth, but `/ml/applications` is?** → Anonymous demo predictions should work frictionlessly; only *persisting/listing personal history* requires knowing who you are.
+27b. **How did you reduce the frontend bundle size?** → Route-level code-splitting with `React.lazy`/`Suspense` (Part 6). Every page behind the authenticated layout became its own chunk instead of one bundle; main bundle went from ~729KB to ~225KB gzipped. `Login`/`Register` stay eager since they're needed immediately for every unauthenticated visitor. Verified by rebuilding (chunk warning gone) and clicking through all 8 lazy routes in a real browser session with zero console errors.
 
 ### Code-level "gotcha" questions
 28. **What happens if a user sends a category value the encoder never saw during training?** → `_encode_feature` catches the `ValueError` from `LabelEncoder.transform` and defaults to `0`; for ordinal features, `_encode_credit_payload`'s caller falls back to the middle value of that map (`sorted(mapping.values())[len(mapping)//2]`).

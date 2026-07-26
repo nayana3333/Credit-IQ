@@ -1,24 +1,34 @@
-﻿import { Navigate, Route, Routes } from "react-router-dom";
+import { Suspense, lazy } from "react";
+import { Navigate, Route, Routes } from "react-router-dom";
 
 import AppLayout from "./components/layout/AppLayout";
-import Assistant from "./pages/Assistant";
-import Analytics from "./pages/Analytics";
-import Applications from "./pages/Applications";
-import BatchPredict from "./pages/BatchPredict";
-import Dashboard from "./pages/Dashboard";
-import LoanDecision from "./pages/LoanDecision";
-import LoanForm from "./pages/LoanForm";
 import Login from "./pages/Login";
-import Profile from "./pages/Profile";
 import Register from "./pages/Register";
-import Simulation from "./pages/Simulation";
+
+const Assistant = lazy(() => import("./pages/Assistant"));
+const Analytics = lazy(() => import("./pages/Analytics"));
+const Applications = lazy(() => import("./pages/Applications"));
+const BatchPredict = lazy(() => import("./pages/BatchPredict"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const LoanDecision = lazy(() => import("./pages/LoanDecision"));
+const LoanForm = lazy(() => import("./pages/LoanForm"));
+const Profile = lazy(() => import("./pages/Profile"));
+const Simulation = lazy(() => import("./pages/Simulation"));
+
+function RouteFallback() {
+  return <div className="p-6 text-[13px] text-[#737373]">Loading...</div>;
+}
 
 function Protected({ children }) {
   if (!localStorage.getItem("token")) {
     return <Navigate to="/login" replace />;
   }
 
-  return <AppLayout>{children}</AppLayout>;
+  return (
+    <AppLayout>
+      <Suspense fallback={<RouteFallback />}>{children}</Suspense>
+    </AppLayout>
+  );
 }
 
 export default function App() {
@@ -45,6 +55,3 @@ export default function App() {
     </Routes>
   );
 }
-
-
-

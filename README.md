@@ -270,6 +270,5 @@ npm run build
 
 Backend tests cover authentication, ML prediction responses, model quality, and
 SHAP/domain consistency checks. The frontend build verifies React/Vite
-production bundling.
-
-The frontend build may warn about large chunks because routes are bundled together. This is not a runtime failure; future polish can lazy-load pages with `React.lazy`.
+production bundling. Routes are code-split with `React.lazy`, so each page
+loads as its own chunk instead of one large bundle.
