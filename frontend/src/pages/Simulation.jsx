@@ -85,7 +85,7 @@ export default function Simulation() {
 
       <section className="space-y-6 lg:col-span-3">
         <div className="ci-panel text-center">
-          <div className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full ${final === "approved" ? "bg-[#F7F5F0] text-[#111111]" : "bg-[#FFFCF7] text-[#111111]"}`}>
+          <div className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full ${final === "approved" ? "bg-[#EEF6EE] text-[#15803D]" : "bg-[#FBECEB] text-[#B91C1C]"}`}>
             {final === "approved" ? <CheckCircle className="h-8 w-8" /> : <XCircle className="h-8 w-8" />}
           </div>
           <p className="mt-3 text-[20px] font-medium capitalize text-[#111111]">{final}</p>
@@ -93,7 +93,17 @@ export default function Simulation() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          {["lr", "rf"].map((key) => <div key={key} className={`rounded-lg border bg-white p-4 ${key === "rf" ? "border-[#D4D4D4]" : "border-[#E5E5E5]"}`}><p className="text-[13px] font-medium">{result?.[key]?.model_name}</p><p className="mt-2 text-[13px] capitalize text-[#737373]">{result?.[key]?.decision}</p><div className="mt-3 h-2 rounded-full bg-[#F7F5F0]"><div className="h-full rounded-full bg-[#111111]" style={{ width: percent(result?.[key]?.good_probability || 0) }} /></div><p className="mt-2 text-[11px] text-[#737373]">Approval probability {percent(result?.[key]?.good_probability || 0)}</p></div>)}
+          {["lr", "rf"].map((key) => {
+            const barColor = result?.[key]?.decision === "approved" ? "#1F9D45" : "#DC2626";
+            return (
+              <div key={key} className={`rounded-lg border bg-white p-4 shadow-[0_1px_2px_rgba(17,17,17,0.04)] ${key === "rf" ? "border-[#2554C7]/30" : "border-[#E5E5E5]"}`}>
+                <p className="text-[13px] font-medium">{result?.[key]?.model_name}</p>
+                <p className="mt-2 text-[13px] capitalize text-[#737373]">{result?.[key]?.decision}</p>
+                <div className="mt-3 h-2 rounded-full bg-[#F1EFE9]"><div className="h-full rounded-full" style={{ width: percent(result?.[key]?.good_probability || 0), background: barColor }} /></div>
+                <p className="mt-2 text-[11px] text-[#737373]">Approval probability {percent(result?.[key]?.good_probability || 0)}</p>
+              </div>
+            );
+          })}
         </div>
 
         <div className="ci-panel">
@@ -110,7 +120,7 @@ export default function Simulation() {
 
         <div className="ci-panel">
           <h2 className="ci-section-title">Main factors in this prediction</h2>
-          <div className="mt-3 grid gap-2 md:grid-cols-3">{reasons.slice(0, 3).map((reason) => <div key={reason.feature} className="rounded-lg bg-[#F7F5F0] p-3 text-[13px]"><p className="font-medium text-[#111111]">{reason.label}</p><p className={reason.direction === "negative" ? "text-[#111111]" : "text-[#111111]"}>{reason.direction} impact</p></div>)}</div>
+          <div className="mt-3 grid gap-2 md:grid-cols-3">{reasons.slice(0, 3).map((reason) => <div key={reason.feature} className="rounded-lg bg-[#F7F5F0] p-3 text-[13px]"><p className="font-medium text-[#111111]">{reason.label}</p><p className={`capitalize font-medium ${reason.direction === "negative" ? "text-[#DC2626]" : "text-[#1F9D45]"}`}>{reason.direction} impact</p></div>)}</div>
         </div>
       </section>
     </div>

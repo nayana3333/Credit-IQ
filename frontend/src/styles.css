@@ -16,9 +16,25 @@
   --ci-border-strong: #d4d4d4;
   --ci-black: #111111;
   --ci-primary-hover: #2a2a2a;
+
+  /* Accent system - deliberately one confident primary (trust/fintech blue),
+     plus semantic status colors. Everything else in the UI stays neutral so
+     these colors keep their signal value instead of competing with decor. */
+  --ci-accent: #2554c7;
+  --ci-accent-hover: #1e429f;
+  --ci-accent-soft: #eaf0fd;
   --ci-blue: #2563eb;
   --ci-orange: #f97316;
-  --ci-shadow: none;
+  --ci-success: #15803d;
+  --ci-success-soft: #eef6ee;
+  --ci-danger: #b91c1c;
+  --ci-danger-soft: #fbeceb;
+  --ci-warning: #b45309;
+  --ci-warning-soft: #fdf3e6;
+
+  --ci-shadow-sm: 0 1px 2px rgba(17, 17, 17, 0.04);
+  --ci-shadow: 0 1px 3px rgba(17, 17, 17, 0.06), 0 1px 2px rgba(17, 17, 17, 0.04);
+  --ci-shadow-lg: 0 8px 24px rgba(17, 17, 17, 0.08), 0 2px 6px rgba(17, 17, 17, 0.04);
 }
 
 html, body {
@@ -64,10 +80,10 @@ body {
 
 .ci-panel {
   border: 1px solid var(--ci-border);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--ci-surface);
   padding: 16px;
-  box-shadow: var(--ci-shadow);
+  box-shadow: var(--ci-shadow-sm);
 }
 
 .ci-button {
@@ -87,6 +103,7 @@ body {
 .ci-button:hover {
   background: var(--ci-primary-hover);
   border-color: var(--ci-primary-hover);
+  box-shadow: var(--ci-shadow);
 }
 
 .ci-button:active {
@@ -124,8 +141,8 @@ body {
 }
 
 .ci-input:focus {
-  border-color: #111111;
-  box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.08);
+  border-color: var(--ci-accent);
+  box-shadow: 0 0 0 3px var(--ci-accent-soft);
 }
 
 .ci-auth-field {
@@ -177,12 +194,12 @@ body {
 }
 
 .ci-table tr:hover td {
-  background: #fafafa;
+  background: var(--ci-accent-soft);
 }
 
 input[type="range"],
 input[type="checkbox"] {
-  accent-color: #111111;
+  accent-color: var(--ci-accent);
 }
 
 

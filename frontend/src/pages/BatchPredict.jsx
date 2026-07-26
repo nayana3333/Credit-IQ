@@ -139,11 +139,11 @@ export default function BatchPredict() {
             <button className="ci-button-secondary" onClick={() => downloadCsv("creditiq-batch-results.csv", results.results)}>Export CSV</button>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: `repeat(${results.summary.invalid ? 5 : 4}, 1fr)`, gap: 12, marginBottom: 20 }}>
-            <MetricCard label="Total" value={results.summary.total} />
-            <MetricCard label="Approved" value={results.summary.approved} valueColor="#111111" />
-            <MetricCard label="Rejected" value={results.summary.rejected} valueColor="#111111" />
-            {results.summary.invalid > 0 && <MetricCard label="Invalid rows" value={results.summary.invalid} valueColor="#A32D2D" />}
-            <MetricCard label="Consensus" value={`${results.summary.consensus_rate}%`} sub="Both models agree" />
+            <MetricCard label="Total" value={results.summary.total} accent="#2554C7" />
+            <MetricCard label="Approved" value={results.summary.approved} valueColor="#15803D" accent="#1F9D45" />
+            <MetricCard label="Rejected" value={results.summary.rejected} valueColor="#B91C1C" accent="#DC2626" />
+            {results.summary.invalid > 0 && <MetricCard label="Invalid rows" value={results.summary.invalid} valueColor="#B45309" accent="#D97706" />}
+            <MetricCard label="Consensus" value={`${results.summary.consensus_rate}%`} sub="Both models agree" accent="#2554C7" />
           </div>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>

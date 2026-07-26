@@ -30,17 +30,17 @@ export function Sidebar() {
 
   const navButtonStyle = (active) => ({
     alignItems: "center",
-    background: active ? "#FAF8F3" : "transparent",
+    background: active ? "#EAF0FD" : "transparent",
     borderBottom: "none",
-    borderLeft: active ? "2px solid #737373" : "2px solid transparent",
+    borderLeft: active ? "2px solid #2554C7" : "2px solid transparent",
     borderRadius: 0,
     borderRight: "none",
     borderTop: "none",
-    color: active ? "#111111" : "#737373",
+    color: active ? "#2554C7" : "#737373",
     cursor: "pointer",
     display: "flex",
     fontSize: 13,
-    fontWeight: active ? 500 : 400,
+    fontWeight: active ? 600 : 400,
     gap: 10,
     padding: "8px 16px",
     textAlign: "left",
@@ -73,7 +73,7 @@ export function Sidebar() {
                   }}
                   style={navButtonStyle(active)}
                 >
-                  <Icon size={16} strokeWidth={1.8} color={active ? "#111111" : "#737373"} />
+                  <Icon size={16} strokeWidth={1.8} color={active ? "#2554C7" : "#737373"} />
                   {label}
                 </button>
               );

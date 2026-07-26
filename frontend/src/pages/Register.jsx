@@ -10,6 +10,7 @@ export default function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [messageTone, setMessageTone] = useState("error");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -22,9 +23,11 @@ export default function Register() {
     try {
       setLoading(true);
       await api.post("/auth/register", { name: normalizedName, email: normalizedEmail, password });
+      setMessageTone("success");
       setMessage("Account created. Redirecting to sign in...");
       setTimeout(() => navigate("/login"), 900);
     } catch (e) {
+      setMessageTone("error");
       setMessage(e.response?.data?.error || "Unable to create account.");
       setLoading(false);
     }
@@ -33,11 +36,11 @@ export default function Register() {
   const inputClass = "ci-input";
 
   return (
-    <div className="min-h-screen bg-[#FFFCF7]">
+    <div className="min-h-screen bg-[#FFFCF7]" style={{ backgroundImage: "radial-gradient(600px circle at 50% 0%, rgba(37,84,199,0.06), transparent 60%)" }}>
       <main className="flex min-h-screen items-center justify-center px-6 py-10">
-        <div className="w-full max-w-[420px] rounded-xl border border-[#E5E5E5] bg-white p-8">
+        <div className="w-full max-w-[420px] rounded-xl border border-[#E5E5E5] bg-white p-8 shadow-[0_8px_24px_rgba(17,17,17,0.06),0_2px_6px_rgba(17,17,17,0.04)]">
           <div className="mb-8 text-center">
-            <p className="text-[18px] font-semibold text-[#111111]">Credit<span className="text-[#737373]">IQ</span></p>
+            <p className="text-[18px] font-semibold text-[#2554C7]">Credit<span className="text-[#111111]">IQ</span></p>
             <h1 className="mt-6 text-[24px] font-semibold text-[#111111]">Create account</h1>
             <p className="mt-2 text-[13px] text-[#737373]">Start a clean credit risk analysis workspace.</p>
           </div>
@@ -74,10 +77,14 @@ export default function Register() {
               {loading ? "Creating account..." : <>Create account <ArrowRight className="h-[15px] w-[15px]" /></>}
             </button>
 
-            {message && <div className="rounded-lg border border-[#D4D4D4] bg-[#FFFCF7] p-3 text-[13px] font-medium text-[#111111]">{message}</div>}
+            {message && (
+              <div className={`rounded-lg border p-3 text-[13px] font-medium ${messageTone === "success" ? "border-[#BFE2C2] bg-[#EEF6EE] text-[#15803D]" : "border-[#F3C6C3] bg-[#FBECEB] text-[#B91C1C]"}`}>
+                {message}
+              </div>
+            )}
 
             <p className="text-center text-[13px] text-[#737373]">
-              Already have an account? <Link to="/login" className="font-medium text-[#111111] hover:underline">Sign in</Link>
+              Already have an account? <Link to="/login" className="font-medium text-[#2554C7] hover:underline">Sign in</Link>
             </p>
             <p className="border-t border-[#E5E5E5] pt-4 text-center text-[12px] leading-5 text-[#737373]">
               Logistic Regression, Random Forest, SHAP explainability, and model analytics in one focused admin interface.

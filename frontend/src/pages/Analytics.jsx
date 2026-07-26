@@ -100,7 +100,7 @@ export default function Analytics() {
       <div className="rounded-lg border border-[#E5E5E5] bg-white p-5">
         <h3 className="font-semibold text-[#111111]">{title}</h3>
         <div className="mt-4 grid grid-cols-2 gap-2">
-          {[["TN", tn, "bg-[#F7F5F0] text-[#111111]"], ["FP", fp, "bg-[#FFFCF7] text-[#111111]"], ["FN", fn, "bg-[#FFFCF7] text-[#111111]"], ["TP", tp, "bg-[#F7F5F0] text-[#111111]"]].map(([label, value, cls]) => (
+          {[["TN", tn, "bg-[#EEF6EE] text-[#15803D]"], ["FP", fp, "bg-[#FDF3E6] text-[#B45309]"], ["FN", fn, "bg-[#FDF3E6] text-[#B45309]"], ["TP", tp, "bg-[#EEF6EE] text-[#15803D]"]].map(([label, value, cls]) => (
             <div key={label} className={`rounded-lg p-5 text-center ${cls}`}>
               <p className="text-xs font-semibold">{label}</p>
               <p className="text-3xl font-semibold">{value}</p>
@@ -158,10 +158,10 @@ export default function Analytics() {
           <div className="rounded-lg border border-[#E5E5E5] bg-white p-5">
             <ResponsiveContainer width="100%" height={320}>
               <RadarChart data={radarData}>
-                <PolarGrid /><PolarAngleAxis dataKey="metric" /><PolarRadiusAxis angle={30} domain={[0, 100]} />
-                <Radar name="LR" dataKey="lr" stroke="#2563EB" fill="#2563EB" fillOpacity={0.25} />
-                <Radar name="RF" dataKey="rf" stroke="#F97316" fill="#F97316" fillOpacity={0.25} />
-                {hasXgb && <Radar name="XGB" dataKey="xgb" stroke="#16A34A" fill="#16A34A" fillOpacity={0.15} />}
+                <PolarGrid stroke="#E5E5E5" /><PolarAngleAxis dataKey="metric" tick={{ fill: "#525252", fontSize: 12 }} /><PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: "#A3A3A3", fontSize: 10 }} />
+                <Radar name="LR" dataKey="lr" stroke="#2563EB" strokeWidth={2} fill="#2563EB" fillOpacity={0.08} />
+                <Radar name="RF" dataKey="rf" stroke="#F97316" strokeWidth={2} fill="#F97316" fillOpacity={0.08} />
+                {hasXgb && <Radar name="XGB" dataKey="xgb" stroke="#16A34A" strokeWidth={2} fill="#16A34A" fillOpacity={0.08} />}
                 <Legend />
               </RadarChart>
             </ResponsiveContainer>

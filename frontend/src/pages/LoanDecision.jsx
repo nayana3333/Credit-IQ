@@ -9,7 +9,7 @@ import SHAPChart from "../components/ui/SHAPChart";
 
 function ModelCard({ result, primary }) {
   return (
-    <div className={`rounded-lg border bg-white p-4 ${primary ? "border-[#D4D4D4]" : "border-[#E5E5E5]"}`}>
+    <div className={`rounded-lg border bg-white p-4 shadow-[0_1px_2px_rgba(17,17,17,0.04)] ${primary ? "border-[#2554C7]/30" : "border-[#E5E5E5]"}`}>
       <div className="flex items-center justify-between gap-3">
         <p className="text-[13px] font-medium text-[#111111]">{result?.model_name}</p>
         <Badge tone={result?.decision === "approved" ? "approved" : "rejected"}>{result?.decision}</Badge>
@@ -19,11 +19,11 @@ function ModelCard({ result, primary }) {
       <div className="mt-4 grid gap-2">
         <div>
           <div className="mb-1 flex justify-between text-[11px] text-[#737373]"><span>Good probability</span><span>{percent(result?.good_probability || 0)}</span></div>
-          <div className="h-2 rounded-full bg-[#F7F5F0]"><div className="h-full rounded-full bg-[#A3A3A3]" style={{ width: percent(result?.good_probability || 0) }} /></div>
+          <div className="h-2 rounded-full bg-[#F1EFE9]"><div className="h-full rounded-full bg-[#1F9D45]" style={{ width: percent(result?.good_probability || 0) }} /></div>
         </div>
         <div>
           <div className="mb-1 flex justify-between text-[11px] text-[#737373]"><span>Bad probability</span><span>{percent(result?.bad_probability || 0)}</span></div>
-          <div className="h-2 rounded-full bg-[#F7F5F0]"><div className="h-full rounded-full bg-[#111111]" style={{ width: percent(result?.bad_probability || 0) }} /></div>
+          <div className="h-2 rounded-full bg-[#F1EFE9]"><div className="h-full rounded-full bg-[#DC2626]" style={{ width: percent(result?.bad_probability || 0) }} /></div>
         </div>
       </div>
     </div>
@@ -160,9 +160,9 @@ export default function LoanDecision() {
         </div>
       </header>
 
-      <div className={`rounded-lg border p-5 ${approved ? "border-[#D4D4D4] bg-[#F7F5F0] text-[#111111]" : "border-[#D4D4D4] bg-[#FFFCF7] text-[#111111]"}`}>
+      <div className={`rounded-lg border p-5 ${approved ? "border-[#BFE2C2] bg-[#EEF6EE] text-[#15803D]" : "border-[#F3C6C3] bg-[#FBECEB] text-[#B91C1C]"}`}>
         <div className="flex items-center gap-3">
-          {approved ? <CheckCircle className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
+          {approved ? <CheckCircle className="h-6 w-6" /> : <AlertCircle className="h-6 w-6" />}
           <p className="text-[32px] font-semibold">{approved ? "Approved" : "Rejected"}</p>
         </div>
       </div>
@@ -181,12 +181,12 @@ export default function LoanDecision() {
             <div className="ci-panel">
               <h2 className="ci-section-title">Logistic Regression explanation</h2>
               <div className="mt-4"><SHAPChart features={data.lr?.shap_reasons || []} /></div>
-              <p className="mt-3 text-[11px] text-[#737373]">Dark bars indicate risk pressure. Grey bars indicate approval support.</p>
+              <p className="mt-3 text-[11px] text-[#737373]"><span className="font-medium text-[#DC2626]">Red</span> bars indicate risk pressure. <span className="font-medium text-[#1F9D45]">Green</span> bars indicate approval support.</p>
             </div>
             <div className="ci-panel">
               <h2 className="ci-section-title">Random Forest explanation</h2>
               <div className="mt-4"><SHAPChart features={data.rf?.shap_reasons || []} /></div>
-              <p className="mt-3 text-[11px] text-[#737373]">Dark bars indicate risk pressure. Grey bars indicate approval support.</p>
+              <p className="mt-3 text-[11px] text-[#737373]"><span className="font-medium text-[#DC2626]">Red</span> bars indicate risk pressure. <span className="font-medium text-[#1F9D45]">Green</span> bars indicate approval support.</p>
             </div>
           </section>
         </main>
@@ -208,14 +208,14 @@ export default function LoanDecision() {
             <h2 className="ci-section-title">Risk actions</h2>
             {approved ? (
               <div className="mt-4 flex gap-3 text-[13px] text-[#111111]">
-                <CheckCircle className="mt-0.5 h-4 w-4" />
+                <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#1F9D45]" />
                 <p>Your application meets the credit criteria. Keep repayment commitments on time and avoid new debt before disbursement.</p>
               </div>
             ) : (
               <div className="mt-4 space-y-3">
                 {(negativeFactors.length ? negativeFactors : [{ label: "Loan Amount" }, { label: "Account Balance" }, { label: "Credit History" }]).map((item) => (
                   <div key={item.feature || item.label} className="flex gap-3 text-[13px] text-[#111111]">
-                    <AlertCircle className="mt-0.5 h-4 w-4 text-[#404040]" />
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#DC2626]" />
                     <p>Improve {item.label || FEATURE_LABELS[item.feature] || item.feature} before reapplying.</p>
                   </div>
                 ))}

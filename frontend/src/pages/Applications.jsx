@@ -66,9 +66,9 @@ export default function Applications() {
       />
 
       <div className="grid gap-3 md:grid-cols-3">
-        <MetricCard label="Total applications" value={applications.length} />
-        <MetricCard label="Approved" value={stats.approved} />
-        <MetricCard label="Requested amount" value={formatCurrency(stats.totalAmount)} />
+        <MetricCard label="Total applications" value={applications.length} accent="#2554C7" />
+        <MetricCard label="Approved" value={stats.approved} accent="#1F9D45" />
+        <MetricCard label="Requested amount" value={formatCurrency(stats.totalAmount)} accent="#D97706" />
       </div>
 
       <section className="ci-panel">

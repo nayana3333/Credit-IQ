@@ -7,26 +7,29 @@ import { displayValue, money, percent } from "../creditFeatures";
 import Badge from "../components/ui/Badge";
 import SHAPChart from "../components/ui/SHAPChart";
 
-function MetricCard({ label, value }) {
+function MetricCard({ label, value, accent }) {
   return (
-    <div className="rounded-lg border border-[#E5E5E5] bg-white px-4 py-3">
+    <div className="relative overflow-hidden rounded-lg border border-[#E5E5E5] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(17,17,17,0.04)]">
+      {accent && <span className="absolute inset-x-0 top-0 h-[3px]" style={{ background: accent }} />}
       <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-[#737373]">{label}</p>
-      <p className="mt-2 text-[24px] font-medium text-[#111111]">{value}</p>
+      <p className="mt-2 text-[24px] font-semibold text-[#111111]">{value}</p>
     </div>
   );
 }
 
 function ModelCard({ result, primary }) {
+  const approved = result?.decision === "approved";
+  const barColor = approved ? "#1F9D45" : result?.decision === "rejected" ? "#DC2626" : "#A3A3A3";
   return (
-    <div className={`rounded-lg border bg-white p-4 ${primary ? "border-[#D4D4D4]" : "border-[#E5E5E5]"}`}>
+    <div className={`rounded-lg border bg-white p-4 shadow-[0_1px_2px_rgba(17,17,17,0.04)] ${primary ? "border-[#2554C7]/30" : "border-[#E5E5E5]"}`}>
       <div className="flex items-center justify-between gap-3">
         <p className="text-[13px] font-medium text-[#111111]">{result?.model_name || "Model"}</p>
         <Badge tone={result?.decision === "approved" ? "approved" : result?.decision === "rejected" ? "rejected" : "pending"}>{result?.decision || "pending"}</Badge>
       </div>
-      <p className="mt-4 text-[24px] font-medium text-[#111111]">{percent(result?.confidence || 0)}</p>
+      <p className="mt-4 text-[24px] font-semibold text-[#111111]">{percent(result?.confidence || 0)}</p>
       <p className="mt-1 text-[11px] text-[#737373]">Confidence</p>
-      <div className="mt-3 h-2 rounded-full bg-[#F7F5F0]">
-        <div className="h-full rounded-full bg-[#111111]" style={{ width: percent(result?.good_probability || 0) }} />
+      <div className="mt-3 h-2 rounded-full bg-[#F1EFE9]">
+        <div className="h-full rounded-full transition-all" style={{ width: percent(result?.good_probability || 0), background: barColor }} />
       </div>
       <p className="mt-1 text-[11px] text-[#737373]">Approval probability {percent(result?.good_probability || 0)}</p>
     </div>
@@ -119,10 +122,10 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
-        <MetricCard label="Total applications" value={data?.total_applications || 0} />
-        <MetricCard label="Approved" value={data?.approved || 0} />
-        <MetricCard label="Approval rate" value={`${data?.approval_rate || 0}%`} />
-        <MetricCard label="RF accuracy" value={`${Math.round((data?.model_accuracy || 0.775) * 1000) / 10}%`} />
+        <MetricCard label="Total applications" value={data?.total_applications || 0} accent="#2554C7" />
+        <MetricCard label="Approved" value={data?.approved || 0} accent="#1F9D45" />
+        <MetricCard label="Approval rate" value={`${data?.approval_rate || 0}%`} accent="#2554C7" />
+        <MetricCard label="RF accuracy" value={`${Math.round((data?.model_accuracy || 0.775) * 1000) / 10}%`} accent="#D97706" />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-5">
@@ -140,7 +143,7 @@ export default function Dashboard() {
               <div className="mt-5">
                 <p className="mb-3 text-[13px] font-medium text-[#111111]">Random Forest explanation</p>
                 <SHAPChart features={latestDecision.rf?.shap_reasons || []} />
-                <p className="mt-3 text-[11px] text-[#737373]">Dark bars indicate risk pressure. Grey bars indicate approval support.</p>
+                <p className="mt-3 text-[11px] text-[#737373]"><span className="font-medium text-[#DC2626]">Red</span> bars indicate risk pressure. <span className="font-medium text-[#1F9D45]">Green</span> bars indicate approval support.</p>
               </div>
             </>
           ) : (
