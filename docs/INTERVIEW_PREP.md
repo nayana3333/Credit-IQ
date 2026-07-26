@@ -263,8 +263,9 @@ There used to be a `Loan`+`LoanDecision` pair duplicating most of this — see t
 - `emi_for_loan`: the standard reducing-balance EMI formula: `EMI = P × r × (1+r)^n / ((1+r)^n − 1)` where `r` is the monthly interest rate.
 - `loan_months`: solves the EMI formula **backwards** for the number of months, given P, rate, and a target EMI (uses a logarithm — derived algebraically from the EMI formula).
 - `amortization_schedule`: month-by-month principal/interest/balance breakdown, used by `/api/v1/loans` to show estimated total interest.
-- `score_from_finances` / `decision_support`: a **separate, rule-based** (not ML) "credit score" and approve/reject/manual-review engine driven by income/expense/EMI ratios with hand-tuned weights (a "fuzzy risk" score). **Not currently called by any active route** — it's leftover/parallel logic from an earlier design iteration of the app, before the ML-based dual-model flow became the primary decision path. Worth mentioning proactively if asked "walk me through every function in this file" rather than being caught not knowing it's unused.
-- `safe_calculate`: a hand-written **AST-based expression evaluator** — parses a math expression string (e.g., `"3000 * 1.08"`) into a Python AST and only permits a whitelist of safe operations (`+ - * / **`, numbers only), explicitly to avoid ever calling Python's real `eval()` on user input (which would be a code-injection vulnerability). Also currently unused by any route, but it's a strong security-awareness talking point if asked about how you'd safely evaluate user-supplied formulas.
+- `clamp`: used by `ml.py`'s heuristic probability fallback when a model `.pkl` fails to load.
+
+*Interview note — this file used to be bigger.* It previously also had `score_from_finances`/`decision_support` (a separate, rule-based, non-ML "credit score" and approve/reject engine from an earlier design direction) and `safe_calculate` (a hand-written AST-based safe expression evaluator, used nowhere). Confirmed via `pyflakes` that nothing referenced them, so during a final cleanup pass they were deleted rather than left as unused code — a real codebase shouldn't carry rule-based scoring logic that a reader might mistake for something the ML-based decision flow actually uses. If asked "why doesn't this file have a credit-scoring function," the honest answer is exactly that: it used to, dead code doesn't help anyone, so it was removed once confirmed unused.
 
 ### `backend/app/routes/ml.py` — the heart of the app
 Already covered in depth in Part 4 and Part 2's request lifecycle. Endpoint summary:
@@ -396,7 +397,6 @@ Since FN costs ~5.6× more than FP per case in this model, the "optimal" policy 
 - JWT-based stateless auth, 1-hour access token expiry.
 - Rate limiting on register/login (5/min) to slow credential-stuffing/brute-force.
 - Email format validated with regex; password policy enforced (8+ chars, ≥1 digit).
-- `safe_calculate`'s AST whitelist instead of raw `eval()` (even though currently unused — it shows the instinct).
 - CORS explicitly enabled rather than left to fail silently in dev.
 - Batch endpoint hard-caps at 100 rows (basic DoS/resource-exhaustion guard).
 - Real Alembic migrations (Flask-Migrate) manage schema changes, applied automatically via `flask db upgrade` in both `Dockerfile` and `docker-compose.yml` before the app starts, with a CI step that verifies migrations apply cleanly to a fresh database on every push (see Part 5's migration story).
@@ -562,11 +562,12 @@ This one has two acts, and telling both is what makes it strong.
 
 ## Part 12 — Known Limitations & What You'd Improve (Say This Proactively)
 
-1. **`finance.py`'s `decision_support`/`score_from_finances`/`safe_calculate` are currently unused** by any live route — leftover from an earlier rule-based (non-ML) design direction. Would either wire them into a real feature (e.g., an "affordability calculator" separate from the credit-risk model) or remove them.
-2. **Business-impact rupee figures are illustrative placeholders**, not calibrated from real recovery-rate/margin data — explicitly noted in the API and README.
-3. **No pagination** on `/ml/applications` — fine at demo scale, would need it in production.
-4. **Backend not fully deployed alongside the frontend** — the Vercel frontend preview needs a live backend URL via `VITE_API_BASE_URL` to be a fully working public demo (this is the single highest-leverage next step for showing this off in interviews).
-5. **No automated model retraining/versioning pipeline** — training is a manual `python train_models.py` step today.
+1. **Business-impact rupee figures are illustrative placeholders**, not calibrated from real recovery-rate/margin data — explicitly noted in the API and README.
+2. **No pagination** on `/ml/applications` — fine at demo scale, would need it in production.
+3. **Backend not fully deployed alongside the frontend** — the Vercel frontend preview needs a live backend URL via `VITE_API_BASE_URL` to be a fully working public demo (this is the single highest-leverage next step for showing this off in interviews).
+4. **No automated model retraining/versioning pipeline** — training is a manual `python train_models.py` step today.
+
+*(`finance.py`'s unused `decision_support`/`score_from_finances`/`safe_calculate` functions — previously on this list — were removed entirely during a final cleanup pass rather than left as dead code or wired into an unneeded feature.)*
 
 *(The `Loan`/`LoanDecision` vs `CreditApplication` duplication — previously the top item here — is fixed; see the schema-consolidation story in Part 5/9.)*
 

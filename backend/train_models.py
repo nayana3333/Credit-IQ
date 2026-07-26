@@ -4,7 +4,6 @@ import urllib.request
 
 import numpy as np
 import pandas as pd
-from pandas.api.types import is_numeric_dtype
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from xgboost import XGBClassifier

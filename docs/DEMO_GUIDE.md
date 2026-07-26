@@ -12,6 +12,8 @@ python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
 copy .env.example .env
+set FLASK_APP=run.py
+flask db upgrade
 python train_models.py
 python create_demo_user.py
 python run.py
@@ -49,15 +51,16 @@ Open `http://localhost:8080`.
 1. Sign in with the demo account.
 2. Open Dashboard and show application counts, approval rate, and latest model decision.
 3. Open Applications and view one decision report.
-4. Open Analytics and show model performance, ROC curves, confusion matrices, and feature importance.
+4. Open Analytics and show model performance (including the XGBoost benchmark), ROC curves, confusion matrices, feature importance, and the calibration reliability diagram.
 5. Open the Business Impact tab and move the threshold slider to explain the cost tradeoff between missed defaults and rejected good customers.
 6. Open What-if Simulator and change loan amount/duration.
 7. Open AI Advisor and ask: "Why was this application rejected?" or "How can approval odds improve?"
 
 ## Interview Talk Track
 
-- The ML layer compares Logistic Regression and Random Forest on the German Credit Dataset.
+- The ML layer compares Logistic Regression and Random Forest on the German Credit Dataset, with XGBoost trained as a tuned benchmark (Random Forest stays the production model).
 - The explainability layer uses SHAP-style factors plus domain sanity checks.
+- The calibration layer checks whether "confidence %" is actually trustworthy (Brier score + reliability diagram) - not just whether the model classifies well.
 - The decision layer turns confusion matrix errors into estimated portfolio cost.
 - The threshold slider shows that lending policy is a risk-appetite decision, not only a model accuracy decision.
 

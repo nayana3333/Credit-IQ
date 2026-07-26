@@ -41,6 +41,10 @@ Environment: VITE_API_BASE_URL=https://<backend-url>/api/v1
 
 ## Production Notes
 
+- Database schema is managed by Alembic migrations (`backend/migrations/`). The
+  Dockerfile already runs `flask db upgrade` before starting gunicorn, so this
+  is automatic for Docker/Render/Railway/Fly.io deployments that use it; only
+  relevant if you run the Flask app some other way.
 - Set strong `SECRET_KEY` and `JWT_SECRET_KEY` values.
 - Set `OPENAI_API_KEY` only on the backend service if GPT-powered advisor
   responses are required.
