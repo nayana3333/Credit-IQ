@@ -39,6 +39,15 @@ Publish directory: dist
 Environment: VITE_API_BASE_URL=https://<backend-url>/api/v1
 ```
 
+**This is a single-page app with client-side routing** (React Router) -
+`/dashboard`, `/assistant`, `/applications/:id`, etc. don't correspond to real
+files, so the host must rewrite every path to `/index.html` and let React
+Router handle it, or direct links/refreshes/bookmarks to any page other than
+the root will 404. `frontend/vercel.json` already configures this for Vercel;
+`render.yaml`'s static frontend service and `frontend/nginx.conf` (used by the
+Docker demo) already have the equivalent rewrite. If deploying to Netlify
+instead, add a `frontend/public/_redirects` file containing `/* /index.html 200`.
+
 ## Production Notes
 
 - Database schema is managed by Alembic migrations (`backend/migrations/`). The

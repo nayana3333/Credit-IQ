@@ -92,7 +92,7 @@ export default function BatchPredict() {
           <div style={{ marginTop: 16, display: "grid", gap: 12 }}>
             {["Download the CSV template", "Fill applicant rows", "Upload and score with LR + RF"].map((step, index) => (
               <div key={step} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ width: 24, height: 24, borderRadius: "50%", background: "#F7F5F0", color: "#111111", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 500 }}>{index + 1}</span>
+                <span style={{ width: 24, height: 24, borderRadius: "50%", background: "#EAF0FD", color: "#2554C7", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 600 }}>{index + 1}</span>
                 <span style={{ fontSize: 13, color: "#111111" }}>{step}</span>
               </div>
             ))}
@@ -117,15 +117,15 @@ export default function BatchPredict() {
               handleFile(event.dataTransfer.files?.[0]);
             }}
             onClick={() => fileInputRef.current?.click()}
-            style={{ border: `2px dashed ${dragOver ? "#111111" : "#D4D4D4"}`, borderRadius: 10, padding: "36px 20px", textAlign: "center", cursor: "pointer", background: dragOver ? "#F7F5F0" : "white", marginTop: 16, marginBottom: 16 }}
+            style={{ border: `2px dashed ${dragOver ? "#2554C7" : "#D4D4D4"}`, borderRadius: 10, padding: "36px 20px", textAlign: "center", cursor: "pointer", background: dragOver ? "#EAF0FD" : "white", marginTop: 16, marginBottom: 16, transition: "all 150ms ease" }}
           >
-            <Upload size={28} color={dragOver ? "#111111" : "#A3A3A3"} />
+            <Upload size={28} color={dragOver ? "#2554C7" : "#A3A3A3"} />
             <p style={{ fontSize: 13, color: "#737373", margin: "10px 0 4px" }}>Drag a CSV here or click to browse</p>
             <p style={{ fontSize: 11, color: "#A3A3A3", margin: 0 }}>Max 100 rows. All feature columns required.</p>
             <input ref={fileInputRef} type="file" accept=".csv" style={{ display: "none" }} onChange={(event) => handleFile(event.target.files?.[0])} />
           </div>
-          {file && <div style={{ background: "#F7F5F0", borderRadius: 7, padding: "8px 12px", marginBottom: 14, fontSize: 12, color: "#404040" }}>{file.name} - {rows.length} applicants loaded</div>}
-          {uploadError && <div style={{ background: "#FFFCF7", border: "1px solid #D4D4D4", borderRadius: 7, padding: "8px 12px", marginBottom: 14, fontSize: 12, color: "#111111" }}>{uploadError}</div>}
+          {file && <div style={{ background: "#EEF6EE", border: "1px solid #BFE2C2", borderRadius: 7, padding: "8px 12px", marginBottom: 14, fontSize: 12, color: "#15803D", fontWeight: 500 }}>{file.name} - {rows.length} applicants loaded</div>}
+          {uploadError && <div style={{ background: "#FBECEB", border: "1px solid #F3C6C3", borderRadius: 7, padding: "8px 12px", marginBottom: 14, fontSize: 12, color: "#B91C1C", fontWeight: 500 }}>{uploadError}</div>}
           <button onClick={runBatch} disabled={!file || batchLoading} className="ci-button" style={{ opacity: !file || batchLoading ? 0.6 : 1 }}>
             {batchLoading ? `Scoring ${rows.length} applicants...` : "Run predictions"}
           </button>

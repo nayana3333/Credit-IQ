@@ -467,6 +467,16 @@ This one has two acts, and telling both is what makes it strong.
 
 **Why this is a good answer**: it shows design work isn't purely cosmetic — a "just recolor some bars" change led to methodically checking real rendered output against expected data, which caught a genuine logic bug that had been silently mis-explaining risk factors to users. That's a stronger answer than reciting hex codes: it demonstrates verifying UI changes against actual data rather than eyeballing that a color "looks about right."
 
+### The missing SPA-rewrite bug (found from a user report, not by guessing)
+
+**Situation**: a report came in that the AI Advisor page "doesn't open in a normal browser." It worked fine navigating there through the app's own sidebar (client-side routing via React Router), so the bug wasn't reproducible by clicking around inside the app.
+
+**Diagnosis**: rather than guess, checked the actual deployed Vercel URL directly — navigating straight to `/assistant` on the live site returned a literal Vercel `404: NOT_FOUND` page, not the app. Confirmed it wasn't Assistant-specific by trying `/dashboard` too — same 404. This is the classic missing-SPA-fallback problem: `/assistant` and `/dashboard` aren't real files on the static host, they're client-side routes that only exist once React Router has already loaded and taken over in the browser. A host serving static files needs an explicit rewrite rule telling it "any path that isn't a real file, serve `index.html` instead and let the JS router handle it" — without that rule, any direct link, bookmark, or page refresh on a non-root route 404s, while clicking through the app's own nav (which never triggers a real page load) works perfectly fine. That's exactly why it looked broken to a user testing a shared/bookmarked link but not during development.
+
+**Fix**: added `frontend/vercel.json` with a catch-all rewrite (`"/(.*)" → "/index.html"`) — the same fix already present in two other places in this repo that never had the bug: `render.yaml`'s static frontend service (`routes: rewrite /* → /index.html`) and `frontend/nginx.conf` (`try_files $uri $uri/ /index.html;`, used by the Docker demo). Only the actual deployed Vercel site was missing the equivalent config, because it was set up directly through Vercel's dashboard rather than from a `vercel.json` checked into the repo.
+
+**Why this is a good answer**: it's a real, user-reported production bug, not a hypothetical — and the diagnosis process matters more than the one-line fix: checking the actual failing environment directly (the live URL) instead of only testing in a dev environment where the bug doesn't reproduce, and cross-referencing against the two *other* deployment configs in the same repo that already handled this correctly, which both confirmed the root cause and supplied the exact fix pattern needed.
+
 ---
 
 ## Part 10 — Interview Question Bank (0 → 100)

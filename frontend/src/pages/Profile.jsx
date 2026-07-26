@@ -52,13 +52,13 @@ export default function Profile() {
       <section className="ci-panel p-6">
         <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-[#E5E5E5] bg-[#FFFCF7] text-lg font-semibold text-[#111111]">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-[#C7D8F8] bg-[#EAF0FD] text-lg font-semibold text-[#2554C7]">
               {initials}
             </div>
             <div>
               <p className="text-lg font-semibold text-[#111111]">{name}</p>
               <p className="mt-1 text-sm text-[#737373]">{email}</p>
-              <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-[#D4D4D4] bg-white px-3 py-1 text-xs font-medium text-[#404040]">
+              <div className={`mt-3 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium ${token ? "border-[#BFE2C2] bg-[#EEF6EE] text-[#15803D]" : "border-[#D4D4D4] bg-white text-[#404040]"}`}>
                 <ShieldCheck className="h-3.5 w-3.5" />
                 {token ? "Signed in" : "Not signed in"}
               </div>

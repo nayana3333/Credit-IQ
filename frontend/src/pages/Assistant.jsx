@@ -40,31 +40,39 @@ export default function Assistant() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-9rem)] flex-col overflow-hidden rounded-lg border border-[#E5E5E5] bg-white">
+    <div className="flex h-[calc(100vh-9rem)] flex-col overflow-hidden rounded-lg border border-[#E5E5E5] bg-white shadow-[0_1px_2px_rgba(17,17,17,0.04)]">
       <header className="border-b border-[#E5E5E5] p-5">
         <h1 className="text-xl font-semibold text-[#111111]">CreditIQ AI Advisor</h1>
         <p className="text-sm text-[#737373]">OpenAI-ready credit risk advisor for model decisions and SHAP explanations</p>
-        {applicationId && <p className="mt-3 rounded-lg bg-[#F7F5F0] px-3 py-2 text-sm font-semibold text-[#111111]">Context: Loan Application #{applicationId} loaded</p>}
+        {applicationId && <p className="mt-3 rounded-lg border border-[#C7D8F8] bg-[#EAF0FD] px-3 py-2 text-sm font-semibold text-[#2554C7]">Context: Loan Application #{applicationId} loaded</p>}
       </header>
 
       <main className="flex-1 space-y-4 overflow-y-auto bg-[#FFFCF7] p-5">
         {messages.map((message, index) => (
           <div key={`${message.time}-${index}`} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-            <div className={`max-w-[78%] rounded-lg px-4 py-3 text-sm ${message.role === "user" ? "bg-[#111111] text-white" : "border border-[#E5E5E5] bg-white text-[#262626]"}`}>
+            <div className={`max-w-[78%] rounded-lg px-4 py-3 text-sm shadow-[0_1px_2px_rgba(17,17,17,0.04)] ${message.role === "user" ? "bg-[#2554C7] text-white" : "border border-[#E5E5E5] bg-white text-[#262626]"}`}>
               <p className="whitespace-pre-line">{message.content}</p>
               <p className={`mt-2 text-[11px] ${message.role === "user" ? "text-white/70" : "text-[#A3A3A3]"}`}>{new Date(message.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
             </div>
           </div>
         ))}
-        {loading && <div className="w-fit rounded-lg border border-[#E5E5E5] bg-white px-4 py-3 text-sm text-[#737373]">Typing...</div>}
+        {loading && (
+          <div className="w-fit rounded-lg border border-[#E5E5E5] bg-white px-4 py-3 text-sm text-[#737373]">
+            <span className="inline-flex items-center gap-1">
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#2554C7]" style={{ animationDelay: "0ms" }} />
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#2554C7]" style={{ animationDelay: "150ms" }} />
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#2554C7]" style={{ animationDelay: "300ms" }} />
+            </span>
+          </div>
+        )}
         <div ref={bottomRef} />
       </main>
 
       <footer className="border-t border-[#E5E5E5] p-4">
-        <div className="mb-3 flex flex-wrap gap-2">{chips.map((chip) => <button key={chip} onClick={() => send(chip)} className="rounded-full border border-[#E5E5E5] px-3 py-1.5 text-xs font-semibold text-[#525252] hover:border-[#111111] hover:text-[#111111]">{chip}</button>)}</div>
+        <div className="mb-3 flex flex-wrap gap-2">{chips.map((chip) => <button key={chip} onClick={() => send(chip)} className="rounded-full border border-[#E5E5E5] px-3 py-1.5 text-xs font-semibold text-[#525252] hover:border-[#2554C7] hover:text-[#2554C7]">{chip}</button>)}</div>
         <div className="flex gap-3">
-          <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder="Ask about a decision, factor, or simulation..." className="flex-1 rounded-lg border border-[#E5E5E5] px-4 py-3 text-sm outline-none focus:border-[#111111]" />
-          <button onClick={() => send()} className="rounded-lg bg-[#111111] px-4 py-3 text-white"><Send className="h-4 w-4" /></button>
+          <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder="Ask about a decision, factor, or simulation..." className="flex-1 rounded-lg border border-[#E5E5E5] px-4 py-3 text-sm outline-none focus:border-[#2554C7] focus:ring-2 focus:ring-[#EAF0FD]" />
+          <button onClick={() => send()} disabled={loading} className="rounded-lg bg-[#2554C7] px-4 py-3 text-white transition hover:bg-[#1E429F] disabled:opacity-50"><Send className="h-4 w-4" /></button>
         </div>
       </footer>
     </div>
