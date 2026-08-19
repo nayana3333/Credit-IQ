@@ -2,7 +2,7 @@
 
 **AI-powered credit risk decision platform** — from raw applicant data to an explainable, cost-aware lending recommendation.
 
-[![CI](https://github.com/nayana3333/CreditIQ/actions/workflows/ci.yml/badge.svg)](https://github.com/nayana3333/CreditIQ/actions/workflows/ci.yml)
+[![CI](https://github.com/nayana3333/Credit-IQ/actions/workflows/ci.yml/badge.svg)](https://github.com/nayana3333/Credit-IQ/actions/workflows/ci.yml)
 [![License: All Rights Reserved](https://img.shields.io/badge/license-All%20Rights%20Reserved-lightgrey.svg)](LICENSE)
 [![Python 3.11](https://img.shields.io/badge/python-3.11-3776AB?logo=python&logoColor=white)](backend/requirements.txt)
 [![React 18](https://img.shields.io/badge/react-18-61DAFB?logo=react&logoColor=white)](frontend/package.json)
@@ -281,7 +281,7 @@ cd frontend
 npm run build
 ```
 
-Backend tests cover authentication, ML prediction responses, model quality, calibration, and SHAP/domain consistency checks, and run in CI on every push ([badge](https://github.com/nayana3333/CreditIQ/actions/workflows/ci.yml) at the top of this file). The frontend build verifies React/Vite production bundling.
+Backend tests cover authentication, ML prediction responses, model quality, calibration, and SHAP/domain consistency checks, and run in CI on every push ([badge](https://github.com/nayana3333/Credit-IQ/actions/workflows/ci.yml) at the top of this file). The frontend build verifies React/Vite production bundling.
 
 ## Known Limitations and Roadmap
 
