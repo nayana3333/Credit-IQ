@@ -3,7 +3,6 @@
 **AI-powered credit risk decision platform** — from raw applicant data to an explainable, cost-aware lending recommendation.
 
 [![CI](https://github.com/nayana3333/Credit-IQ/actions/workflows/ci.yml/badge.svg)](https://github.com/nayana3333/Credit-IQ/actions/workflows/ci.yml)
-[![License: All Rights Reserved](https://img.shields.io/badge/license-All%20Rights%20Reserved-lightgrey.svg)](LICENSE)
 [![Python 3.11](https://img.shields.io/badge/python-3.11-3776AB?logo=python&logoColor=white)](backend/requirements.txt)
 [![React 18](https://img.shields.io/badge/react-18-61DAFB?logo=react&logoColor=white)](frontend/package.json)
 [![Flask 3](https://img.shields.io/badge/flask-3.0-black?logo=flask&logoColor=white)](backend/requirements.txt)
