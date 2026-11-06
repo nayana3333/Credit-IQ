@@ -61,6 +61,7 @@ def create_app(test_config=None):
         }
 
     @app.get("/api/v1/health")
+    @limiter.exempt
     def health():
         return {"status": "ok"}
 
